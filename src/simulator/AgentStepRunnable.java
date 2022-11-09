@@ -88,6 +88,7 @@ public class AgentStepRunnable implements Runnable {
                 agent.setEnvError(true);
                 nextStep = new Point(agent.getLocation());
             }
+
             if (nextStep == null) {
                 nextStep = agent.getLocation();
                 agent.setEnvError(true);

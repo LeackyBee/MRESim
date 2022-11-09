@@ -58,19 +58,14 @@ import config.SimConstants;
 import config.SimulatorConfig;
 import environment.Environment;
 import environment.Environment.Status;
+import environment.OccupancyGrid;
 import gui.MainGUI;
 import java.awt.Point;
 import java.awt.Polygon;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.Scanner;
+import java.io.*;
+import java.util.*;
 import javax.swing.ImageIcon;
 import javax.swing.Timer;
 import org.json.JSONArray;
@@ -120,6 +115,8 @@ public class SimulationFramework implements ActionListener {
     double avgTimeLastCommand;
     double totalDistanceTraveled;
     int numSwaps;
+    int experiment = 0;
+    FileOutputStream outputFile;
 
     RobotTeamConfig robotTeamConfig;
 
@@ -176,7 +173,7 @@ public class SimulationFramework implements ActionListener {
     private void createAgents(RobotTeamConfig robotTeamConfig) {
         numRobots = robotTeamConfig.getNumRobots();
         agent = new RealAgent[numRobots];
-        TeammateAgent teammate[] = new TeammateAgent[numRobots];
+        TeammateAgent[] teammate = new TeammateAgent[numRobots];
         agentRange = new Polygon[numRobots];
 
         // Create BaseStation
@@ -236,40 +233,58 @@ public class SimulationFramework implements ActionListener {
     }
 
     public boolean simulationCycle() {
-        if (timeElapsed == 1) {
+        // only run at start
+        if (timeElapsed == 0) {
+            try {
+                outputFile = new FileOutputStream("/home/alec/Documents/Cambridge/Work/dissertation/Test Data/experiment".concat(String.valueOf(experiment)).concat(".txt"), true);
+
+                experiment += 1;
+
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            int goalArea = env.getTotalFreeSpace();
+            // tells each agent how much of the map is actually "free space" so it can calculate how much it knows
+            // in practice this wouldn't be possible, since to do this we need a map prior to running
+            Arrays.stream(agent).forEach((a) -> a.getStats().setGoalArea(goalArea));
+        } else if (timeElapsed == 1) {
             simStartTime = System.currentTimeMillis();
         }
-        //set exploration goals at the start of the mission
-        if (timeElapsed == 0) {
-            for (int i = 0; i < numRobots; i++) {
-                agent[i].getStats().setGoalArea(env.getTotalFreeSpace());
-            }
-        }
 
+        // Communications:
+
+        // detects all 1-hop comm links and uses these to find all multi-hop links
         detectCommunication();
 
         for (int i = 0; i < numRobots - 1; i++) {
             for (int j = i + 1; j < numRobots; j++) {
                 if (multihopCommTable[i][j] >= 1) {
+                    // Teammate Agents are the object held by each robot to store information about the other agents
+                    // If there is a multi-hop link between i and j, set their connection state to true
                     agent[i].getTeammate(agent[j].getID()).setCommunicationLink(true);
                     agent[j].getTeammate(agent[i].getID()).setCommunicationLink(true);
                 }
             }
         }
 
-        agentSteps();               // move agents, simulate sensor data
-        for (int i = 0; i < numRobots; i++) {
-            agent[i].flushComms();
-        }
-        simulateCommunication();    // simulate communication
+        Arrays.stream(agent).forEach(RealAgent::flushComms);
+        // Simulate map sharing
+        simulateCommunication();
 
+
+        // Move agents
+        agentSteps();
+
+        // Update data
         if (timeElapsed % SimConstants.UPDATE_AGENT_KNOWLEDGE_INTERVAL == 0) {
             updateAgentKnowledgeData();
         }
         updateGlobalData();         // update data
-        updateGUI();                // update GUI
-
+        updateGUI();    // update GUI
         mainGUI.updateRobotConfig();
+
+
+        // Logging
         logging();                  // perform logging as required
 
         robotTeamConfig.getRobotTeam().entrySet().stream().filter((entry) -> (entry.getValue().getLoggingState())).forEach((entry) -> {
@@ -284,6 +299,21 @@ public class SimulationFramework implements ActionListener {
 
         checkPause();               // check whether user wanted to pause
         avgCycleTime = (int) (System.currentTimeMillis() - simStartTime) / timeElapsed;
+
+        try {
+            OccupancyGrid total = new OccupancyGrid(env.getColumns(), env.getRows());
+            Arrays.stream(agent).forEach(a -> total.mergeGrid(a.getOccupancyGrid(),false));
+            double totalKnown = 100*total.getNumFreeCells() / (double) totalArea;
+            outputFile.write(String.valueOf(timeElapsed)
+                            .concat(" : ")
+                            .concat(String.valueOf(pctAreaKnownTeam))
+                            .concat(" : ")
+                            .concat(String.valueOf(totalKnown))
+                            .concat("\n")
+                            .getBytes());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         return checkRunFinish(agent, timeElapsed, pctAreaKnownTeam, avgCycleTime);           // for scripting multiple runs, to max number of cycles
     }
 
@@ -477,15 +507,7 @@ public class SimulationFramework implements ActionListener {
     }
 
     private boolean baseStationDone() {
-        /*for(RealAgent a: agent) {
-            if(a.getID() == 1)
-                continue;
-            if(!a.isMissionComplete())
-                return false;
-            if(!a.getTeammate(1).isInRange())
-                return false;
-        }
-        return true;*/
+        // If the base station knows enough of the map
         return (((double) agent[0].getStats().getAreaKnown() / (double) totalArea) >= SimConstants.TERRITORY_PERCENT_EXPLORED_GOAL);
     }
 
@@ -535,6 +557,7 @@ public class SimulationFramework implements ActionListener {
 
         List<Thread> threads = new ArrayList<Thread>();
         for (RealAgent agent1 : agent) {
+            // If the agent is a Comm Station it doesn't move
             if (agent1.getClass().toString().equals(ComStation.class.toString())) {
                 continue;
             }

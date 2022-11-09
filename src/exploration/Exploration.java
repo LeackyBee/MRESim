@@ -54,15 +54,15 @@ import java.awt.Point;
 public interface Exploration {
 
     /**
-     * Calculates the next step the robot shouls take. This calls replan is necessary.
+     * Calculates the next step the robot should take. This calls replan is necessary.
      *
      * @param timeElapsed Cycle we are in currently
      * @return Next step
      */
-    public Point takeStep(int timeElapsed);
+    Point takeStep(int timeElapsed);
 
-    public void setCommand(String command);
+    void setCommand(String command);
 
-    public void setCommandData(Integer command_data);
+    void setCommandData(Integer command_data);
 
 }

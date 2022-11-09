@@ -89,7 +89,7 @@ public class OccupancyGrid implements IntGrid {
      * that we are currently "responsible" for delivering to base
      */
     private HashMap<Point, Integer> cellsFreeNotKnownAtBaseNotRelayed;
-    // log the changes so we don't have to process every caell each time we merge grids
+    // log the changes, so we don't have to process every cell each time we merge grids
     private HashMap<Point, Integer> cellsChanged;
 
     //this is a flag that can be used to check if occupancy grid has changed since it was last set to 'false'

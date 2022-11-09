@@ -148,7 +148,7 @@ public class RandomExploration extends BasicExploration implements Exploration {
             default:
         }
 
-        //If the stati stil is exploring, we explore, if it changed we stay still (state must be setting relay)
+        // If the state is still exploring, we explore, if it changed we stay still (state must be setting relay)
         if (state == Agent.ExplorationState.Explore) {
             return RandomWalk.randomStep(agent, 10);
         } else {

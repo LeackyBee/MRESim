@@ -122,7 +122,7 @@ public class MainGUI extends javax.swing.JFrame {
         simConfig = new SimulatorConfig();
         updateFromRobotTeamConfig();
         updateFromEnvConfig();
-        //simulation = new SimulationFramework(this, robotTeamConfig, simConfig, explorationImage);
+        simulation = new SimulationFramework(this, robotTeamConfig, simConfig, explorationImage);
 
         initGraphFrame();
     }

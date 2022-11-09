@@ -1,19 +1,19 @@
-RoleBasedExploration
+FrontierExploration
 PeriodicReturn
 RangeBorder
 null
 StaticCircle
 false
-/home/christian/MRESim/logs/defaultAgentLog.txt
+/home/alec/Documents/MRESim Logs/AgentLocations.txt
 false
-/home/christian/MRESim/logs/defaultDataLog.txt
+/home/alec/Documents/MRESim Logs/SimData.txt
 false
 null
 false
 false
 false
 false
-2
+10
 false
 false
 0.7
