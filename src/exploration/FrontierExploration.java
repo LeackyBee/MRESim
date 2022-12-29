@@ -114,7 +114,6 @@ public class FrontierExploration extends BasicExploration implements Exploration
     protected FrontierExploration(RealAgent agent, SimulatorConfig simConfig, RealAgent baseStation, SimulatorConfig.frontiertype frontierType) {
         super(agent, simConfig, Agent.ExplorationState.Initial);
         this.relayType = simConfig.getRelayAlgorithm();
-        this.agent = agent;
         this.frontierExpType = frontierType;
         this.baseStation = baseStation;
         this.noReturnTimer = 0;
@@ -133,6 +132,7 @@ public class FrontierExploration extends BasicExploration implements Exploration
             agent.getPath().setInvalid();
             this.recentEnvError = true;
         }
+
         if (agent.getTeammate(SimConstants.BASE_STATION_TEAMMATE_ID).hasCommunicationLink()) {
             agent.getStats().setTimeLastDirectContactCS(1);
             agent.getStats().setLastContactAreaKnown(agent.getStats().getAreaKnown());
@@ -216,6 +216,7 @@ public class FrontierExploration extends BasicExploration implements Exploration
         if (frontierExpType.equals(SimulatorConfig.frontiertype.PeriodicReturn) && noReturnTimer > (int) (simConfig.PERIODIC_RETURN_PERIOD * ((double) (max_no_change_counter + 10) / 10))) {
             agent.setExploreState(Agent.ExplorationState.ReturnToBase);
         }
+
         if (frontierExpType.equals(SimulatorConfig.frontiertype.UtilReturn)) {
             double infoRatio = (double) agent.getStats().getCurrentBaseKnowledgeBelief()
                     / (double) (agent.getStats().getCurrentBaseKnowledgeBelief() + agent.getStats().getNewInfo());
@@ -224,7 +225,7 @@ public class FrontierExploration extends BasicExploration implements Exploration
             }
         }
         calculateFrontiers();
-//        frontiers.forEach(f -> System.out.println(f));
+
         //If no frontiers found, or reached exploration goal, return to ComStation
         if (((frontiers.isEmpty()) || no_change_counter > 20 || (agent.getStats().getPercentageKnown() >= SimConstants.TERRITORY_PERCENT_EXPLORED_GOAL))) {
             agent.setMissionComplete(true);
@@ -235,6 +236,7 @@ public class FrontierExploration extends BasicExploration implements Exploration
 
         FrontierUtility best;
         best = chooseFrontier(true);
+
         //If could not find frontier, try to disregard other agents when planning
         if (best == null) {
             best = chooseFrontier(false);
@@ -327,27 +329,26 @@ public class FrontierExploration extends BasicExploration implements Exploration
     /**
      * Calculates Euclidean distance from all known teammates and self to frontiers of interest
      */
-    private PriorityQueue initializeUtilities(PriorityQueue<Frontier> frontierlist, boolean considerOtherAgents) {
-        PriorityQueue<FrontierUtility> utilities = new PriorityQueue<FrontierUtility>();
+    private PriorityQueue<FrontierUtility> initializeUtilities(PriorityQueue<Frontier> frontierlist, boolean considerOtherAgents) {
+        PriorityQueue<FrontierUtility> utilities = new PriorityQueue<>();
 
         // For each frontier of interest
         for (Frontier frontier : frontierlist) {
             // Add own utilities
             utilities.add(new FrontierUtility(agent, frontier));
             // Add teammates' utilities
-            for (TeammateAgent teammate : agent.getAllTeammates().values()) {
-                if (considerOtherAgents
-                        && teammate.isExplorer()
-                        && teammate.getTimeSinceLastComm() < SimConstants.REMEMBER_TEAMMATE_FRONTIER_PERIOD) {
-
-                    utilities.add(new FrontierUtility(teammate,
-                            frontier));
+            if(considerOtherAgents){
+                for (TeammateAgent teammate : agent.getAllTeammates().values()) {
+                    if (teammate.isExplorer() && teammate.getTimeSinceLastComm() < SimConstants.REMEMBER_TEAMMATE_FRONTIER_PERIOD) {
+                        utilities.add(new FrontierUtility(teammate, frontier));
+                    }
                 }
             }
+
         }
 
         utilities.forEach((FrontierUtility u) -> {
-            u.getEcaxtUtility(agent);
+            u.getExactUtility(agent);
         });
         return utilities;
     }
@@ -368,10 +369,10 @@ public class FrontierExploration extends BasicExploration implements Exploration
                 util_iter.remove();
                 continue;
             }
-            // Check if this is the only remaining frontier would be a little optimization
 
-            // /it's not possible to plan a path to this frontier or we are already there, so eliminate it entirely
-            if (best.getEcaxtUtility(agent) < 0) {
+            // Check if this is the only remaining frontier would be a little optimization
+            // it's not possible to plan a path to this frontier or we are already there, so eliminate it entirely
+            if (best.getExactUtility(agent) < 0) {
                 badUtilities.add(best);
                 for (FrontierUtility u : utilities) {
                     if (u.getFrontier() == best.getFrontier()) {
@@ -381,7 +382,6 @@ public class FrontierExploration extends BasicExploration implements Exploration
                 if (best.getAgent() == agent) {
                     agent.addBadFrontier(best.getFrontier()); //only add bad frontiers if they are 'ours'
                 }
-
             } else if (utilities.isEmpty() || (best.getUtility() >= utilities.peek().getUtility())) {
                 //as the utility estimate is an optimistic heuristic if the best.utility is better as the peek-utility... go and get it
                 //if (!considerOtherAgents || best.getAgent() == agent) {

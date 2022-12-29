@@ -1,4 +1,4 @@
-FrontierExploration
+RoleBasedExploration
 PeriodicReturn
 RangeBorder
 null

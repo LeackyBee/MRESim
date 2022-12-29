@@ -82,6 +82,7 @@ public class AgentStepRunnable implements Runnable {
             //Get next step
             try {
                 nextStep = agent.takeStep(timeElapsed);
+
             } catch (RuntimeException e) {
                 System.err.println("AgentStepRunnable: " + e.toString());
                 e.printStackTrace();
@@ -96,6 +97,13 @@ public class AgentStepRunnable implements Runnable {
                 System.err.println(agent + " !!! setting envError because nextStep is null, "
                         + "distance_left is " + distance_left);
             }
+
+            /**
+             System.out.println(String.valueOf(timeElapsed).concat(" : Distance left  : ".concat(String.valueOf(distance_left))));
+            System.out.println(String.valueOf(timeElapsed).concat(" : Distance point : ".concat(String.valueOf(nextStep.distance(agent.getLocation())))));
+            System.out.println(String.valueOf(timeElapsed).concat(" : Point          : ").concat(nextStep.getLocation().toString()));
+            System.out.println(String.valueOf(timeElapsed).concat(" : Location       : ").concat(agent.getLocation().toString()));
+            **/
 
             //Check to make sure step is legal
             if (env.legalMove(agent.getLocation(), nextStep, agent.ability)) {

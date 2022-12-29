@@ -10,6 +10,7 @@ import environment.ContourTracer;
 import environment.Frontier;
 
 import java.awt.*;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -20,6 +21,8 @@ public class FrontierAlec extends BasicExploration implements Exploration{
     PriorityQueue<Frontier> frontiers = new PriorityQueue<>();
     Point destination = null;
     boolean exactPath = false;
+
+    HashSet<Integer> oldComms = new HashSet<>();
 
 
     /**
@@ -33,14 +36,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
     @Override
     protected Point takeStep_explore(int timeElapsed) {
         // not needed
-        System.out.println("take-step-explore");
-        calculateFrontiers();
-        //chooseFrontier();
-        if(destination != null){
-            return destination;
-        } else{
-            return agent.baseStation.getLocation();
-        }
+        return null;
     }
 
     protected Stream<TeammateAgent> getCommunications(){
@@ -50,21 +46,60 @@ public class FrontierAlec extends BasicExploration implements Exploration{
 
     @Override
     public Point takeStep(int timeElapsed) {
+        agent.flushLog();
+        Point output;
 
-        Stream<TeammateAgent> communications = getCommunications();
-
+        // Checks if the robot has begun communicating with another robot
+        // This check is important as this signals that new data has been received
         AtomicBoolean newComm = new AtomicBoolean(false);
 
+        HashSet<Integer> newComms = new HashSet<>();
+        getCommunications()
+                .forEach(a ->
+                        {
+                            newComm.set(newComm.get() || !oldComms.contains(a.getRobotNumber()));
+                            newComms.add(a.getRobotNumber());
+                        });
+
+        oldComms = newComms;
+
+        // if there has been a new communication, reset variables
         if(newComm.get()){
-            path = null;
             exactPath = false;
             destination = null;
             agent.setEnvError(false);
-            agent.getPath().setInvalid();
+            if(agent.getPath() != null){
+                agent.getPath().setInvalid();
+                agent.setPath(null);
+            }
+            if(agent.getEnvError()){
+                agent.setEnvError(false);
+            }
         }
 
+
+        if(agent.getEnvError() && exactPath){
+            agent.announce("Randomly Walking");
+            agent.setEnvError(false);
+            return RandomWalk.randomStep(agent, agent.getSpeed());
+        } else if(agent.getEnvError()){
+            if (agent.getPath() != null){
+                agent.getPath().setInvalid();
+            }
+            agent.announce("Planning Path");
+            exactPath = true;
+            agent.setEnvError(false);
+            path = agent.calculatePath(destination, true);
+            agent.setPath(path);
+            return agent.getNextPathPoint();
+        } else if(exactPath && !agent.getPath().isFinished()){
+            agent.announce("Following Path");
+            return agent.getNextPathPoint();
+        }
+
+        // if the agent is at the destination, reset variables
         if(agent.getLocation().equals(destination)) {
-            announce("Destination Reached");
+            agent.announce("Destination Reached");
             destination = null;
             if (agent.getPath() != null) {
                 agent.getPath().setInvalid();
@@ -72,64 +107,54 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             }
         }
 
-        if(agent.getEnvError() && exactPath){
-            announce("Randomly Walking");
-            agent.setEnvError(false);
-            return RandomWalk.randomStep(agent, agent.getSpeed());
-        } else if(agent.getEnvError()){
-            if (agent.getPath() != null){
-                agent.getPath().setInvalid();
-            }
-            announce("Planning Path");
-            exactPath = true;
-            agent.setEnvError(false);
-            path = agent.calculatePath(destination, true);
-            agent.setPath(path);
-            return agent.getNextPathPoint();
-        } else if(exactPath){
-            announce("Following Path");
-            return agent.getNextPathPoint();
-        }
-
-        chooseFrontier(communications, agent.getRobotNumber());
+        chooseFrontier(getCommunications(), agent.getRobotNumber());
         if(destination != null && !agent.isMissionComplete()){
-            announce("New Destination: ".concat(destination.toString()));
+            agent.announce("New Destination: ".concat(destination.toString()));
             return destination;
         } else {
-            announce("Base Station");
+            agent.announce("Base Station");
             return agent.baseStation.getLocation();
         }
 
 
     }
 
-    // Prepends the robots number, so it is easy to tell which robot triggered the statement.
-    private void announce(String message){
-        System.out.println("(".concat(String.valueOf(agent.getRobotNumber())).concat(") ").concat(message));
-    }
 
 
-    protected void chooseFrontier(Stream<TeammateAgent> communications, int robotNumber){
+
+    protected Point chooseFrontier(Stream<TeammateAgent> communications, int robotNumber){
+        // if we don't know where to go, or have reached our destination, choose a new one.
         if (destination == null || agent.getLocation().equals(destination)) {
             // figure out the options
             calculateFrontiers();
-
 
             // figure out which option we choose
             long index = communications.filter(a -> a.getRobotNumber() < robotNumber)
                     .count();
 
             // choose the option
+            if(frontiers.size() == 0){
+                index = 0;
+            } else{
+                index = index % frontiers.size();
+            }
+
+            // Uncomment to see the frontier list
+            //agent.announce(String.valueOf(frontiers));
+
             Frontier frontier = frontiers.poll();
-            for(int i = 0; i < index % frontiers.size(); i++){
+            for(int i = 0; i < index; i++){
                 frontier = frontiers.poll();
             }
             if(frontier == null){
-                destination = null;
+                // should only occur if the frontier list is empty, which tells us we need to go back to the base
+                System.out.println("null destination?");
+                destination = agent.baseStation.getLocation();
             } else{
                 destination = frontier.getCentre();
             }
         }
+        return destination;
     }
 
     // Boilerplate code to find the frontiers

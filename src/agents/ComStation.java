@@ -63,6 +63,6 @@ public class ComStation extends RealAgent {
 
     @Override
     public void writeStep(Point nextLoc, double[] sensorData, boolean updateSensorData) {
-        batteryPower -= energyCunsumption;
+        batteryPower -= energyConsumption;
     }
 }

@@ -72,13 +72,7 @@ public class FrontierUtility implements Comparable<FrontierUtility> {
 
     @Override
     public int compareTo(FrontierUtility other) {
-        if (other.utility > this.utility) {
-            return 1;
-        } else if (other.utility == this.utility) {
-            return 0;
-        } else {
-            return -1;
-        }
+        return (int) (other.utility - this.utility);
     }
 
     public Path getPath(RealAgent calcAgent) {
@@ -104,7 +98,7 @@ public class FrontierUtility implements Comparable<FrontierUtility> {
         return exact;
     }
 
-    public double getEcaxtUtility(RealAgent calcAgent) {
+    public double getExactUtility(RealAgent calcAgent) {
         if (!exact) {
             calculateUtilityExact(calcAgent);
         }
@@ -142,5 +136,7 @@ public class FrontierUtility implements Comparable<FrontierUtility> {
             utility = -1000;
         }
         exact = true;
+
+        System.out.println(this);
     }
 }

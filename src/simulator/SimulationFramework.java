@@ -86,7 +86,7 @@ public class SimulationFramework implements ActionListener {
 
     MainGUI mainGUI;                            // Allows simulator to change image, data
     ExplorationImage image;                     // Image of environment
-    private Environment env;                            // The environment (walls, obstacles)
+    private Environment env;                     // The environment (walls, obstacles)
     RealAgent[] agent;                           // The agents
     int numRobots;
 
@@ -233,6 +233,8 @@ public class SimulationFramework implements ActionListener {
     }
 
     public boolean simulationCycle() {
+        System.out.println();
+        System.out.println("Timestep: ".concat(String.valueOf(timeElapsed)));
         // only run at start
         if (timeElapsed == 0) {
             try {
@@ -300,6 +302,7 @@ public class SimulationFramework implements ActionListener {
         checkPause();               // check whether user wanted to pause
         avgCycleTime = (int) (System.currentTimeMillis() - simStartTime) / timeElapsed;
 
+        // Alec logging code
         try {
             OccupancyGrid total = new OccupancyGrid(env.getColumns(), env.getRows());
             Arrays.stream(agent).forEach(a -> total.mergeGrid(a.getOccupancyGrid(),false));

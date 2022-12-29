@@ -53,13 +53,7 @@ import config.SimulatorConfig;
 import environment.Frontier;
 import environment.OccupancyGrid;
 import environment.TopologicalMap;
-import exploration.Exploration;
-import exploration.FrontierExploration;
-import exploration.LeaderFollower;
-import exploration.RandomExploration;
-import exploration.RoleBasedExploration;
-import exploration.RunFromLog;
-import exploration.WallFollowExploration;
+import exploration.*;
 import exploration.rendezvous.IRendezvousStrategy;
 import exploration.rendezvous.RendezvousAgentData;
 import exploration.rendezvous.RendezvousStrategyFactory;
@@ -104,7 +98,7 @@ public class RealAgent extends Agent {
 
     // Teammates
     HashMap<Integer, TeammateAgent> teammates;
-    private RealAgent baseStation;
+    public RealAgent baseStation;
 
     // Role-based Exploration
     private RendezvousAgentData rendezvousAgentData;
@@ -243,6 +237,18 @@ public class RealAgent extends Agent {
         } else {
             return null;
         }
+    }
+
+    String log = "";
+
+    // Prepends the robots number, so it is easy to tell which robot triggered the statement.
+    public void announce(String message){
+        log = log.concat("(".concat(String.valueOf(getRobotNumber())).concat(") ").concat(message).concat("\n"));
+    }
+
+    public void flushLog(){
+        System.out.println(log);
+        log = "";
     }
 
     public Frontier getFrontier() {
@@ -504,15 +510,14 @@ public class RealAgent extends Agent {
                         setState(((RunFromLog) exploration).getState(timeElapsed));
                         setRole(((RunFromLog) exploration).getRole(timeElapsed));
                         break;
-
                     case LeaderFollower:
                         exploration = new LeaderFollower(this, simConfig, baseStation);
                         break;
                     case FrontierExploration:
-                        exploration = new FrontierExploration(this, simConfig, baseStation);
+                        exploration = new FrontierAlec(this, simConfig, ExplorationState.Initial);
                         break;
                     case RoleBasedExploration:
-                        exploration = new RoleBasedExploration(timeElapsed, this, simConfig, this.getRendezvousStrategy(), baseStation);
+                        exploration = new RoleAlec(this, simConfig, ExplorationState.Initial);
                         break;
                     case Testing:
                     case Random:
@@ -611,8 +616,8 @@ public class RealAgent extends Agent {
 
         // NEW METHOD FLOOD FILL
         //updateGrid(sensorData);
-        batteryPower -= energyCunsumption;
-        this.getStats().incrementEnergyConsumption(energyCunsumption);
+        batteryPower -= energyConsumption;
+        this.getStats().incrementEnergyConsumption(energyConsumption);
     }
 
     /**
@@ -1070,7 +1075,7 @@ public class RealAgent extends Agent {
     }
 
     public boolean isCommunicating() {
-        return teammates.values().stream().anyMatch((teammate) -> (teammate.hasCommunicationLink()));
+        return teammates.values().stream().anyMatch(TeammateAgent::hasCommunicationLink);
     }
 
     public void updateAfterCommunication() {

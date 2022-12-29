@@ -67,7 +67,7 @@ abstract public class Agent {
     int sensRange;          // Sensing range (radius)
     int commRange;          // Communication range (radius)
     int batteryPower;
-    int energyCunsumption;
+    int energyConsumption;
     public int ability;
     public ArrayList<ComStation> comStations;
     private int comStationLimit;
@@ -95,7 +95,7 @@ abstract public class Agent {
     private int timeSinceGetChildInfo; //how long since we got child info
 
     // Keeps historical data about agent knowledge
-    public Map<Integer, Double> knowledgeData = new HashMap();
+    public Map<Integer, Double> knowledgeData = new HashMap<>();
 
     public Agent(RobotConfig robot) {
         robotNumber = robot.getRobotNumber();
@@ -264,12 +264,12 @@ abstract public class Agent {
         this.heading = newHeading;
     }
 
-    public int getEnergyCunsumption() {
-        return energyCunsumption;
+    public int getEnergyConsumption() {
+        return energyConsumption;
     }
 
-    public void setEnergyCunsumption(int energyCunsumption) {
-        this.energyCunsumption = energyCunsumption;
+    public void setEnergyConsumption(int energyConsumption) {
+        this.energyConsumption = energyConsumption;
     }
 
     public RobotConfig.roletype getExploreMode() {
@@ -387,7 +387,7 @@ abstract public class Agent {
                 this.ability,
                 this.comStationLimit,
                 this.speed,
-                this.energyCunsumption);
+                this.energyConsumption);
         return robot;
     }
 

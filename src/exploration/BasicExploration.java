@@ -70,7 +70,7 @@ abstract class BasicExploration {
      */
     Path path;
 
-    Agent.ExplorationState state = Agent.ExplorationState.Initial;
+    Agent.ExplorationState state;
 
     SimulatorConfig simConfig;
 
@@ -82,7 +82,7 @@ abstract class BasicExploration {
     /**
      * Just builds the object and initializes the agent.
      *
-     * @param agent The agend using this ExplorationStrategy
+     * @param agent The agent using this ExplorationStrategy
      */
     public BasicExploration(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
         this.agent = agent;
@@ -100,7 +100,6 @@ abstract class BasicExploration {
     abstract protected Point takeStep_explore(int timeElapsed);
 
     protected boolean noRelay(Point p) {
-
         for (TeammateAgent agt : agent.getAllTeammates().values()) {
             if (agt.isStationary() && agt.getLocation().equals(p)) {
                 return false;
