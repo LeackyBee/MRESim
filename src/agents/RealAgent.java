@@ -501,6 +501,7 @@ public class RealAgent extends Agent {
             return getLocation();
         }
 
+        System.out.println(oldTimeElapsed != timeElapsed);
         if (oldTimeElapsed != timeElapsed) {
             // First call in cycle
             if (exploration == null) {
@@ -511,7 +512,7 @@ public class RealAgent extends Agent {
                         setRole(((RunFromLog) exploration).getRole(timeElapsed));
                         break;
                     case LeaderFollower:
-                        exploration = new LeaderFollower(this, simConfig, baseStation);
+                        exploration = new LeaderFollowerAlec(this, simConfig, ExplorationState.Initial);
                         break;
                     case FrontierExploration:
                         exploration = new FrontierAlec(this, simConfig, ExplorationState.Initial);
@@ -548,7 +549,8 @@ public class RealAgent extends Agent {
                 case RunFromLog:
                     break;
                 case LeaderFollower:
-                    nextStep = this.getNextPathPoint();
+                    // Edited to make the agent always run my code - Alec
+                    nextStep = exploration.takeStep(timeElapsed);
                     break;
                 case FrontierExploration:
                     nextStep = this.getNextPathPoint();

@@ -5,11 +5,8 @@ import agents.RealAgent;
 import config.RobotConfig;
 import config.SimConstants;
 import config.SimulatorConfig;
-import environment.Frontier;
 
 import java.awt.*;
-import java.util.ArrayList;
-
 public class RoleAlec extends FrontierAlec{
 
     private enum State{
@@ -50,8 +47,6 @@ public class RoleAlec extends FrontierAlec{
 
         }
         comm.setRendezvous(agent.baseStation.getLocation());
-
-        System.out.println(comm.hashCode());
     }
 
     // ? to find time to return to relay, figure out round trip time of travelling to each relay inbetween using distance/speed
@@ -65,16 +60,12 @@ public class RoleAlec extends FrontierAlec{
         }
         switch (agentState){
             case Exploring:
-                agent.announce("Exploring");
                 return takeStep_explore(timeElapsed);
             case ReturnToBase:
-                agent.announce("Running To Base");
                 return takeStep_ReturnToBase(timeElapsed);
             case RunningToRelay:
-                agent.announce("Running to Rendezvous");
                 return takeStep_RunningToRelay(timeElapsed);
             case WaitingAtRelay:
-                agent.announce("Waiting at Rendezvous");
                 return takeStep_WaitingAtRelay(timeElapsed);
             default:
                 agent.announce("Default");
@@ -84,6 +75,7 @@ public class RoleAlec extends FrontierAlec{
 
     @Override
     protected Point takeStep_explore(int timeElapsed) {
+        agent.announce("Exploring");
         returnTimer = returnTimer-1;
         if(returnTimer == 0){
             agentState = State.RunningToRelay;
@@ -96,6 +88,8 @@ public class RoleAlec extends FrontierAlec{
     }
 
     private Point takeStep_ReturnToBase(int timeElapsed){
+        agent.announce("Running To Base");
+
         agent.setPathToBaseStation(false);
         if(agent.getTeammateByNumber(SimConstants.BASE_STATION_TEAMMATE_ID).hasCommunicationLink()){
             agentState = State.RunningToRelay;
@@ -105,40 +99,28 @@ public class RoleAlec extends FrontierAlec{
     }
 
     private Point takeStep_RunningToRelay(int timeElapsed){
+        agent.announce("Running to Rendezvous");
+
         if(isNearEnough(agent.getLocation(), comm.getRendezvous())){
             agentState = State.WaitingAtRelay;
             return takeStep_WaitingAtRelay(timeElapsed);
         }
 
-        if(agent.getEnvError() && exactPath){
-            agent.announce("Randomly Walking");
+        if(agent.getEnvError()){
             agent.setEnvError(false);
-            return RandomWalk.randomStep(agent, agent.getSpeed());
-        } else if(agent.getEnvError()){
-            if (agent.getPath() != null){
-                agent.getPath().setInvalid();
-            }
-            agent.announce("Planning Path");
             exactPath = true;
-            agent.setEnvError(false);
-            path = agent.calculatePath(destination, true);
-            agent.setPath(path);
-            return agent.getNextPathPoint();
-        } else if(exactPath){
-            agent.announce("Following Path");
-            return agent.getNextPathPoint();
-        } else {
-            return comm.getRendezvous();
         }
+
+        if(agent.getPath() != null && !agent.getPath().isFinished()){
+            return agent.getNextPathPoint();
+        }
+        agent.setPath(agent.calculatePath(comm.getRendezvous(), exactPath));
+        exactPath = false;
+        return agent.getNextPathPoint();
     }
 
-    // TODO: path planning for relay
     private Point takeStep_WaitingAtRelay(int timeElapsed){
-        if(agent.getEnvError()){
-            // One cause of EnvErrors is standing still, so we need to remove this before changing to the next state
-            agent.setEnvError(false);
-        }
-
+        agent.announce("Waiting at Rendezvous");
         // Uncomment to see where the agent is and if it is actually at the rendezvous
         //agent.announce(agent.getLocation().toString().concat(" : ").concat(comm.getRendezvous().toString()));
 
@@ -159,7 +141,7 @@ public class RoleAlec extends FrontierAlec{
                 return takeStep_ReturnToBase(timeElapsed);
             }
         }
-        return null;
+        return agent.stay();
     }
 
     private boolean isNearEnough(Point p1, Point p2){

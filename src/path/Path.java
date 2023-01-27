@@ -51,10 +51,8 @@ import environment.TopologicalMap;
 import gui.ShowSettings.ShowSettingsAgent;
 import java.awt.Point;
 import java.io.File;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
+
 import simulator.ExplorationImage;
 
 /**
@@ -81,17 +79,17 @@ public class Path {
     private boolean jump;
     private boolean valid = true;
     private boolean exact;
-
     private Path() {
 
     }
 
     public Path(OccupancyGrid agentGrid, Point startpoint, Point endpoint, boolean limit, boolean jump, boolean exact) {
+        this.reverse = false;
         this.startPoint = startpoint;
         this.goalPoint = endpoint;
         this.limit = limit;
         this.grid = agentGrid;
-        this.jump = jump = false;
+        this.jump = jump;
         this.tMap = null;
         this.pathPoints = new LinkedList<Point>();
         this.reversePathPoints = null;
@@ -107,10 +105,12 @@ public class Path {
                 this.found = calculateAStarPath(exact);
             }
         }
+
     }
 
     public Path(OccupancyGrid agentGrid, TopologicalMap tMap,
             Point startpoint, Point endpoint, boolean limit, boolean jump, boolean exact) throws IllegalStateException {
+        this.reverse = false;
         this.startPoint = startpoint;
         this.goalPoint = endpoint;
         this.tMap = tMap;
@@ -127,6 +127,30 @@ public class Path {
         this.allPathPixels = null;
         this.length = 0;
         this.exact = exact;
+
+        calcuateTopoPath();
+    }
+
+    public Path(Path p) throws IllegalStateException {
+        this.reverse = p.reverse;
+        this.currentPoint = p.currentPoint;
+        this.valid = p.valid;
+        this.startPoint = p.startPoint;
+        this.goalPoint = p.goalPoint;
+        this.tMap = p.tMap;
+        this.grid = p.grid;
+        this.pathPoints = new ArrayList<>(p.pathPoints);
+        this.pathNodes = new LinkedList<>(p.pathNodes);
+        this.pathNodesReverse = p.pathNodesReverse;
+        this.pathSections = p.pathSections;
+
+        this.limit = p.limit;
+        this.jump = p.jump;
+        this.found = p.found;
+        this.reversePathPoints = p.reversePathPoints;
+        this.allPathPixels = p.allPathPixels;
+        this.length = p.length;
+        this.exact = p.exact;
 
         calcuateTopoPath();
     }
@@ -762,6 +786,7 @@ public class Path {
 
     public Path getReversePath() {
         //Path p = new Path(grid, goalPoint, startPoint, limit, jump, false);
+
         Path p = new Path();
         p.pathPoints = reversePathPoints;
         p.reversePathPoints = pathPoints;
@@ -774,6 +799,7 @@ public class Path {
         p.currentPoint = 0;
         p.exact = exact;
         p.grid = grid;
+
         if (pathSections != null) {
             p.pathSections = new LinkedList<>();
             for (int i = pathSections.size() - 1; i >= 0; i--) {
@@ -928,6 +954,11 @@ public class Path {
             }
         }
     }
+    boolean reverse;
+
+    public void AlecReverse(){
+        reverse = !reverse;
+    }
 
     /**
      * New method to use paths: create path and walk through it by itetator nextPoint.
@@ -945,21 +976,34 @@ public class Path {
                 }
             }
         }
-        //currentPoint starts with 0 (startPoint) so we want to increment first!
-        // pathPoints.size() - 1 is the goalPoint
-        if (currentPoint >= pathPoints.size() - 1) {
-            currentPoint = pathPoints.size() - 1;
-        } else {
-            currentPoint++;
+        if(reverse){
+            if (currentPoint <= 0) {
+                currentPoint = 0;
+            } else {
+                currentPoint--;
+            }
+        } else{
+            //currentPoint starts with 0 (startPoint) so we want to increment first!
+            // pathPoints.size() - 1 is the goalPoint
+            if (currentPoint >= pathPoints.size() - 1) {
+                currentPoint = pathPoints.size() - 1;
+            } else {
+                currentPoint++;
+            }
         }
+
         if (currentPoint < 0) {
             throw new RuntimeException("FATAL ERROR: Path is size 0");
         }
+
         return pathPoints.get(currentPoint);
+    }
+    public int getIndex(){
+        return currentPoint;
     }
 
     public boolean isFinished() {
-        return currentPoint >= pathPoints.size() - 1;
+        return reverse ? currentPoint < 0 : currentPoint >= pathPoints.size() - 1;
     }
 
     public void resetStep() {

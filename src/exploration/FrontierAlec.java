@@ -70,50 +70,34 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             agent.setEnvError(false);
             if(agent.getPath() != null){
                 agent.getPath().setInvalid();
-                agent.setPath(null);
             }
             if(agent.getEnvError()){
                 agent.setEnvError(false);
             }
         }
 
-
-        if(agent.getEnvError() && exactPath){
-            agent.announce("Randomly Walking");
+        // If we have an EnvError the agent is stuck, so we need an exact path
+        if(agent.getEnvError()){
             agent.setEnvError(false);
-            return RandomWalk.randomStep(agent, agent.getSpeed());
-        } else if(agent.getEnvError()){
-            if (agent.getPath() != null){
-                agent.getPath().setInvalid();
-            }
-            agent.announce("Planning Path");
+            agent.getPath().setInvalid();
             exactPath = true;
-            agent.setEnvError(false);
-            path = agent.calculatePath(destination, true);
-            agent.setPath(path);
-            return agent.getNextPathPoint();
-        } else if(exactPath && !agent.getPath().isFinished()){
-            agent.announce("Following Path");
-            return agent.getNextPathPoint();
+        } else{
+            exactPath = false;
         }
 
-        // if the agent is at the destination, reset variables
-        if(agent.getLocation().equals(destination)) {
-            agent.announce("Destination Reached");
-            destination = null;
-            if (agent.getPath() != null) {
-                agent.getPath().setInvalid();
-                exactPath = false;
-            }
+        if(agent.getPath() != null && !agent.getPath().isFinished()){
+            return agent.getNextPathPoint();
         }
 
         chooseFrontier(getCommunications(), agent.getRobotNumber());
         if(destination != null && !agent.isMissionComplete()){
             agent.announce("New Destination: ".concat(destination.toString()));
-            return destination;
+            agent.setPath(agent.calculatePath(destination, exactPath));
+            return agent.getNextPathPoint();
         } else {
+            agent.setPathToBaseStation(exactPath);
             agent.announce("Base Station");
-            return agent.baseStation.getLocation();
+            return agent.getNextPathPoint();
         }
 
 
@@ -139,8 +123,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
                 index = index % frontiers.size();
             }
 
-            // Uncomment to see the frontier list
-            //agent.announce(String.valueOf(frontiers));
 
             Frontier frontier = frontiers.poll();
             for(int i = 0; i < index; i++){
@@ -148,7 +130,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             }
             if(frontier == null){
                 // should only occur if the frontier list is empty, which tells us we need to go back to the base
-                System.out.println("null destination?");
                 destination = agent.baseStation.getLocation();
             } else{
                 destination = frontier.getCentre();

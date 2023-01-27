@@ -544,5 +544,4 @@ public class RoleBasedExploration extends FrontierExploration {
         tempBorder.remove(node);
         return node.isDeadEnd();
     }
-
 }
