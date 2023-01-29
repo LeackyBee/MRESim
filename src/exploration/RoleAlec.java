@@ -7,7 +7,14 @@ import config.SimConstants;
 import config.SimulatorConfig;
 
 import java.awt.*;
+//TODO: Better return timer reset value
 public class RoleAlec extends FrontierAlec{
+
+    private static final int RETURN_TIMER_DEFAULT = 50;
+
+    private static final State INITIAL_STATE = State.RunningToRelay;
+    private static final int COMMUNICATION_TIMEOUT = 10;
+
 
     private enum State{
         ReturnToBase,
@@ -16,28 +23,32 @@ public class RoleAlec extends FrontierAlec{
         Exploring
     }
 
-    AlecCommunication comm;
-    State agentState;
+    private final AlecCommunication comm;
+    private State agentState;
 
-    int returnTimer;
-    int returnTimerDefault;
-    int partnerNumber;
+    private int returnTimer;
+
+    private final int partnerNumber;
+    // The number of timesteps between successive communications
+    // Prevents the robots infinitely recognising they are talking and never escaping
+    private int timeSinceLastComm = Integer.MAX_VALUE - 10;
+
 
 
     /**
      * Just builds the object and initializes the agent.
      *
      * @param agent        The agent using this ExplorationStrategy
-     * @param simConfig
-     * @param initialState
+     * @param simConfig    Passed to super()
+     * @param initialState Passed to super()
      */
     public RoleAlec(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
         super(agent, simConfig, initialState);
-        System.out.println("It's using the Role-Based");
-        returnTimerDefault = 50;
-        returnTimer = 50;
-        agentState = State.WaitingAtRelay;
-        agent.announce(String.valueOf(agent.getRobotNumber()));
+        agent.announce("Initiated Role-Based");
+
+        returnTimer = RETURN_TIMER_DEFAULT;
+        agentState = INITIAL_STATE;
+
         if(agent.getRole() == RobotConfig.roletype.Explorer){
             partnerNumber = agent.getParent();
             comm = AlecCommunication.getCommunication(agent.getRobotNumber());
@@ -46,19 +57,27 @@ public class RoleAlec extends FrontierAlec{
             comm = AlecCommunication.getCommunication(partnerNumber);
 
         }
+
         comm.setRendezvous(agent.baseStation.getLocation());
     }
 
-    // ? to find time to return to relay, figure out round trip time of travelling to each relay inbetween using distance/speed
     @Override
     public Point takeStep(int timeElapsed) {
         agent.flushLog();
+        if(timeElapsed == 0){
+            return agent.stay();
+        }
+
+        timeSinceLastComm++;
+
         agent.announce("Rendezvous is ".concat(comm.getRendezvous().toString()));
         agent.announce("Current Position is ".concat(agent.getLocation().toString()));
-        if(timeElapsed == 0){
-            return agent.baseStation.getLocation();
+
+        if(agent.isExplorer() && destination != null){
+            agent.announce("Destination is ".concat(destination.toString()));
         }
-        switch (agentState){
+
+        switch (agentState) {
             case Exploring:
                 return takeStep_explore(timeElapsed);
             case ReturnToBase:
@@ -68,8 +87,7 @@ public class RoleAlec extends FrontierAlec{
             case WaitingAtRelay:
                 return takeStep_WaitingAtRelay(timeElapsed);
             default:
-                agent.announce("Default");
-                return super.takeStep(timeElapsed);
+                throw new IllegalArgumentException();
         }
     }
 
@@ -77,74 +95,146 @@ public class RoleAlec extends FrontierAlec{
     protected Point takeStep_explore(int timeElapsed) {
         agent.announce("Exploring");
         returnTimer = returnTimer-1;
+
         if(returnTimer == 0){
             agentState = State.RunningToRelay;
             if(agent.getPath() != null){
                 agent.getPath().setInvalid();
             }
-            return comm.getRendezvous();
+            destination = null;
+            agent.setPath(agent.calculatePath(comm.getRendezvous(), false));
+            return takeStep_RunningToRelay(timeElapsed);
         }
+
+
+        // If relay is met while exploring, we may as well skip the going to the rendezvous point and find a new one
+        if(agent.getTeammate(partnerNumber).hasCommunicationLink() && timeSinceLastComm >= COMMUNICATION_TIMEOUT){
+            return meetRendezvous(timeElapsed);
+        }
+
         return super.takeStep(timeElapsed);
     }
 
     private Point takeStep_ReturnToBase(int timeElapsed){
         agent.announce("Running To Base");
 
-        agent.setPathToBaseStation(false);
+        if(agent.getEnvError()){
+            exactPath = true;
+            dealWithEnvError();
+        }
+
+        if(agent.getPath() == null){
+            agent.announce("Planning New Path to Base Station");
+            agent.setPathToBaseStation(exactPath);
+            exactPath = false;
+        }
+
+
+        if(agent.getTeammate(partnerNumber).hasCommunicationLink() && timeSinceLastComm >= COMMUNICATION_TIMEOUT){
+            return meetRendezvous(timeElapsed);
+        }
+
+
+        // Can now switch to "RunningToRelay"
         if(agent.getTeammateByNumber(SimConstants.BASE_STATION_TEAMMATE_ID).hasCommunicationLink()){
+            agent.getPath().setInvalid();
+            agent.setPath(agent.calculatePath(comm.getRendezvous(), false));
             agentState = State.RunningToRelay;
             return takeStep_RunningToRelay(timeElapsed);
+        } else {
+            return agent.getNextPathPoint();
         }
-        return agent.getNextPathPoint();
     }
 
     private Point takeStep_RunningToRelay(int timeElapsed){
         agent.announce("Running to Rendezvous");
 
-        if(isNearEnough(agent.getLocation(), comm.getRendezvous())){
-            agentState = State.WaitingAtRelay;
-            return takeStep_WaitingAtRelay(timeElapsed);
+        if(agent.getTeammate(partnerNumber).hasCommunicationLink() && timeSinceLastComm >= COMMUNICATION_TIMEOUT){
+            return meetRendezvous(timeElapsed);
         }
 
+
+        if(agent.getLocation().equals(comm.getRendezvous())){
+            agent.announce("Reached Rendezvous");
+            if(agent.getPath() != null){
+                agent.getPath().setInvalid();
+            }
+            agent.setPath(null);
+            agentState = State.WaitingAtRelay;
+            return takeStep_WaitingAtRelay(timeElapsed);
+        } else if(agent.getPath() != null && agent.getPath().isFinished()){
+            agent.announce("Path did not end at rendezvous, replanning (problem)");
+            agent.getPath().setInvalid();
+            agent.setPath(null);
+        } // Shouldn't get triggered
+
         if(agent.getEnvError()){
-            agent.setEnvError(false);
+            dealWithEnvError();
             exactPath = true;
         }
 
-        if(agent.getPath() != null && !agent.getPath().isFinished()){
-            return agent.getNextPathPoint();
+
+        if(agent.getPath() == null){
+            agent.announce("Planning path to rendezvous");
+            agent.setPath(agent.calculatePath(comm.getRendezvous(), exactPath));
+            exactPath = false;
         }
-        agent.setPath(agent.calculatePath(comm.getRendezvous(), exactPath));
-        exactPath = false;
+
         return agent.getNextPathPoint();
     }
 
     private Point takeStep_WaitingAtRelay(int timeElapsed){
         agent.announce("Waiting at Rendezvous");
-        // Uncomment to see where the agent is and if it is actually at the rendezvous
-        //agent.announce(agent.getLocation().toString().concat(" : ").concat(comm.getRendezvous().toString()));
 
-        if(!isNearEnough(agent.getLocation(), comm.getRendezvous())){
-            agent.announce("Not Near Enough");
+        // Should never get triggered
+        if(!agent.getLocation().equals(comm.getRendezvous())){
+            agent.announce("Not Actually At Rendezvous (Problem)");
             agentState = State.RunningToRelay;
             return takeStep_RunningToRelay(timeElapsed);
         }
 
-        if(agent.getTeammate(partnerNumber).hasCommunicationLink()){
-            if(agent.isExplorer()){
-                agentState = State.Exploring;
-                return takeStep_explore(timeElapsed);
-            } else {
-                agentState = State.ReturnToBase;
-                comm.setRendezvous(chooseFrontier(getCommunications(), partnerNumber));
-                agent.announce("Rendezvous set to ".concat(comm.getRendezvous().toString()));
-                return takeStep_ReturnToBase(timeElapsed);
-            }
+        if(agent.getTeammate(partnerNumber).hasCommunicationLink() && timeSinceLastComm >= COMMUNICATION_TIMEOUT){
+            return meetRendezvous(timeElapsed);
+        } else {
+            return agent.stay();
         }
-        return agent.stay();
     }
 
-    private boolean isNearEnough(Point p1, Point p2){
-        return p1.distance(p2) < 10;
+    private synchronized Point meetRendezvous(int timeElapsed){
+        returnTimer = RETURN_TIMER_DEFAULT;
+        agent.announce("Met Partner");
+        // Make sure the explorer passes here first
+        if(!agent.isExplorer() && !comm.isRendezvousChanged()){
+            System.out.println("caught");
+            System.out.println(agent.getName());
+            return agent.stay();
+        }
+
+        timeSinceLastComm = 0;
+
+        if(agent.getPath() != null){
+            agent.getPath().setInvalid();
+        }
+
+        // This section ensures that only one of the pair change the rendezvous, and deals with race conditions
+        if(agent.isExplorer()){
+            // destination must be null for chooseFrontier to run
+            destination = null;
+
+            chooseFrontier(getCommunications(), agent.isExplorer() ? agent.getRobotNumber() : partnerNumber);
+            comm.setRendezvous(destination);
+            agent.announce("Rendezvous set to ".concat(comm.getRendezvous().toString()));
+
+            agentState = State.Exploring;
+            agent.setPath(agent.calculatePath(destination,false));
+            return takeStep_explore(timeElapsed);
+        } else{
+            // this clears the branch for the next time we get here
+            comm.ackRendezvous();
+            agentState = State.ReturnToBase;
+            agent.setPathToBaseStation(false);
+            return takeStep_ReturnToBase(timeElapsed);
+        }
+
     }
 }

@@ -243,7 +243,7 @@ public class RealAgent extends Agent {
 
     // Prepends the robots number, so it is easy to tell which robot triggered the statement.
     public void announce(String message){
-        log = log.concat("(".concat(String.valueOf(getRobotNumber())).concat(") ").concat(message).concat("\n"));
+        log = log.concat("(".concat(String.valueOf(getName())).concat(") ").concat(message).concat("\n"));
     }
 
     public void flushLog(){
@@ -306,11 +306,14 @@ public class RealAgent extends Agent {
     }
 
     public Point getNextPathPoint() {
+        if(path.getIndex() <= 0 && path.GetAlecReverse()){
+            return baseStation.getLocation();
+        }
         return path.nextPoint();
     }
 
     public void setPathToBaseStation(boolean exact) {
-        setPath(calculatePath(this.getAllTeammates().get(SimConstants.BASE_STATION_TEAMMATE_ID).getLocation(), exact));
+        setPath(calculatePath(baseStation.getLocation(), exact));
     }
 
     public boolean isMissionComplete() {
@@ -501,7 +504,6 @@ public class RealAgent extends Agent {
             return getLocation();
         }
 
-        System.out.println(oldTimeElapsed != timeElapsed);
         if (oldTimeElapsed != timeElapsed) {
             // First call in cycle
             if (exploration == null) {
@@ -549,8 +551,10 @@ public class RealAgent extends Agent {
                 case RunFromLog:
                     break;
                 case LeaderFollower:
+                    nextStep = this.getNextPathPoint();
+
                     // Edited to make the agent always run my code - Alec
-                    nextStep = exploration.takeStep(timeElapsed);
+                    //nextStep = exploration.takeStep(timeElapsed);
                     break;
                 case FrontierExploration:
                     nextStep = this.getNextPathPoint();

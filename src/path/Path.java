@@ -959,6 +959,7 @@ public class Path {
     public void AlecReverse(){
         reverse = !reverse;
     }
+    public boolean GetAlecReverse(){ return reverse;}
 
     /**
      * New method to use paths: create path and walk through it by itetator nextPoint.
@@ -978,7 +979,8 @@ public class Path {
         }
         if(reverse){
             if (currentPoint <= 0) {
-                currentPoint = 0;
+                //System.out.println("Start Point");
+                return startPoint;
             } else {
                 currentPoint--;
             }
@@ -1003,7 +1005,7 @@ public class Path {
     }
 
     public boolean isFinished() {
-        return reverse ? currentPoint < 0 : currentPoint >= pathPoints.size() - 1;
+        return reverse ? currentPoint <= 0 : currentPoint >= pathPoints.size() - 1;
     }
 
     public void resetStep() {
@@ -1031,9 +1033,7 @@ public class Path {
 
     public void setInvalid() {
         if (this.pathSections != null) {
-            pathSections.stream().forEach(p -> {
-                p.setInvalid();
-            });
+            pathSections.stream().forEach(Path::setInvalid);
         }
         this.found = false;
         this.valid = false;

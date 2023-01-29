@@ -47,7 +47,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
     @Override
     public Point takeStep(int timeElapsed) {
         agent.flushLog();
-        Point output;
 
         // Checks if the robot has begun communicating with another robot
         // This check is important as this signals that new data has been received
@@ -56,10 +55,10 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         HashSet<Integer> newComms = new HashSet<>();
         getCommunications()
                 .forEach(a ->
-                        {
-                            newComm.set(newComm.get() || !oldComms.contains(a.getRobotNumber()));
-                            newComms.add(a.getRobotNumber());
-                        });
+                {
+                    newComm.set(newComm.get() || !oldComms.contains(a.getRobotNumber()));
+                    newComms.add(a.getRobotNumber());
+                });
 
         oldComms = newComms;
 
@@ -71,9 +70,8 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             if(agent.getPath() != null){
                 agent.getPath().setInvalid();
             }
-            if(agent.getEnvError()){
-                agent.setEnvError(false);
-            }
+            agent.setPath(null);
+            agent.setEnvError(false);
         }
 
         // If we have an EnvError the agent is stuck, so we need an exact path
@@ -90,13 +88,15 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         }
 
         chooseFrontier(getCommunications(), agent.getRobotNumber());
+
         if(destination != null && !agent.isMissionComplete()){
             agent.announce("New Destination: ".concat(destination.toString()));
-            agent.setPath(agent.calculatePath(destination, exactPath));
+            //agent.setPath(agent.calculatePath(agent.getLocation(), destination, true, exactPath));
+            agent.setPath(agent.calculatePath(destination,exactPath));
             return agent.getNextPathPoint();
         } else {
             agent.setPathToBaseStation(exactPath);
-            agent.announce("Base Station");
+            agent.announce("Going to Base Station");
             return agent.getNextPathPoint();
         }
 
@@ -106,7 +106,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
 
 
 
-    protected Point chooseFrontier(Stream<TeammateAgent> communications, int robotNumber){
+    protected void chooseFrontier(Stream<TeammateAgent> communications, int robotNumber){
         // if we don't know where to go, or have reached our destination, choose a new one.
         if (destination == null || agent.getLocation().equals(destination)) {
             // figure out the options
@@ -123,7 +123,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
                 index = index % frontiers.size();
             }
 
-
             Frontier frontier = frontiers.poll();
             for(int i = 0; i < index; i++){
                 frontier = frontiers.poll();
@@ -135,7 +134,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
                 destination = frontier.getCentre();
             }
         }
-        return destination;
     }
 
     // Boilerplate code to find the frontiers
@@ -151,14 +149,22 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         // convert the contours to frontiers, and filter out all those that are invalid
         for (LinkedList<Point> contour : contours) {
             Frontier frontier = new Frontier(agent.getX(), agent.getY(), contour);
-           if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !agent.isBadFrontier(frontier)){
-               frontiers.add(frontier);
-           }
+            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !agent.isBadFrontier(frontier)){
+                frontiers.add(frontier);
+            }
         }
 
     }
 
     public PriorityQueue<Frontier> getFrontiers() {
         return frontiers;
+    }
+
+    protected void dealWithEnvError(){
+        if(agent.getPath() != null){
+            agent.getPath().setInvalid();
+            agent.setPath(null);
+        }
+        agent.setEnvError(false);
     }
 }

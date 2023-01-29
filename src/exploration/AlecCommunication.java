@@ -9,6 +9,7 @@ public class AlecCommunication {
     private static Map<Integer, AlecCommunication> commAgents = new HashMap<>();
 
     private Point rendezvous;
+    private boolean rendezvousChanged = false;
 
     private AlecCommunication(){
 
@@ -25,7 +26,16 @@ public class AlecCommunication {
     }
 
     public synchronized void setRendezvous(Point suggested){
+        rendezvousChanged = true;
         rendezvous = suggested;
+    }
+
+    public boolean isRendezvousChanged(){
+        return rendezvousChanged;
+    }
+
+    public synchronized void ackRendezvous(){
+        rendezvousChanged = false;
     }
 
     public synchronized Point getRendezvous(){

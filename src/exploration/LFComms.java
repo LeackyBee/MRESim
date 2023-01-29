@@ -5,6 +5,7 @@ import communication.PropModel1;
 import config.SimConstants;
 import environment.ContourTracer;
 import environment.Frontier;
+import path.Path;
 
 import java.awt.*;
 import java.util.*;
@@ -45,7 +46,7 @@ public class LFComms {
 
 
 
-    private PriorityQueue<Frontier> frontiers;
+    private final PriorityQueue<Frontier> frontiers;
     private Frontier f;
 
     private LFComms(){
@@ -104,34 +105,12 @@ public class LFComms {
 
         switch (agentStates.get(agentToIndex.get(a))){
             case GoingHome:
-                a.announce("Going Home");
-                // Ensures that the agents all go to the base station immediately
-                // Only called in the first timestep
-                if(a.getPath() == null){
-                    a.setPath(a.calculatePath(baseStation.getLocation(), false));
-                }
-
-                if(a.getLocation().equals(baseStation.getLocation())){
-                    setState(a, LFState.WaitAtBS);
-                    return a.stay();
-                }
-
-                next = a.getNextPathPoint();
-
-                if(a.getPath().getIndex() == 0){
-                    return baseStation.getLocation();
-                }
-                if(isPositionOkay(a, next)){
-                    return next;
-                } else{
-                    a.getPath().resetStep();
-                    return a.stay();
-                }
-
+                return goingHome(a);
             case WaitAtBS:
                 a.announce("Waiting at Base");
                 if(allInState(LFState.WaitAtBS)){
                     agentToIndex.keySet().forEach(agent -> setState(agent, LFState.GoingToFrontier));
+                    leader.addBadFrontier(f);
                     newPaths();
                 }
                 return a.stay();
@@ -142,7 +121,7 @@ public class LFComms {
 
                 if(isPositionOkay(a, next) && !a.getPath().isFinished()){
                     // If a has moved forward, its successors may be able to move now
-                    triggerSuccessors(a);
+                    setSuccessors(a, LFState.GoingToFrontier);
                     return next;
                 } else{
                     // assume that this means the robot is as far as it can go
@@ -160,10 +139,10 @@ public class LFComms {
                     return a.stay();
                 }
             case WaitForSuccessors:
-                a.announce("How?");
-                break;
+                a.announce("Waiting for Successors?");
+                return a.stay();
             case MovingToPredecessor:
-                a.announce("How?");
+                a.announce("Moving to Predecessors");
                 break;
             case MovingToPoint:
                 break;
@@ -173,6 +152,41 @@ public class LFComms {
 
     }
 
+    private synchronized Point goingHome(RealAgent a){
+        a.announce("Going Home");
+
+        if(a.getLocation().equals(baseStation.getLocation())){
+            a.announce("Reached Base");
+            if(a.getPath() != null){
+                a.getPath().setInvalid();
+            }
+            setState(a, LFState.WaitAtBS);
+            return a.stay();
+        }
+
+        // Ensures that the agents all go to the base station immediately
+        // Should only be called in the first timestep
+        if(a.getPath() == null){
+            a.announce("Path null");
+            a.setPathToBaseStation(true);
+        }
+
+
+        if(a.getPath().getIndex() == 0){
+            return baseStation.getLocation();
+        }
+
+        Point next = a.getNextPathPoint();
+
+        if(isPositionOkay(a, next)){
+            a.announce("Position Okay");
+            return next;
+        } else{
+            a.announce("Position Not Okay");
+            a.getPath().resetStep();
+            return a.stay();
+        }
+    }
 
 
 
@@ -195,11 +209,11 @@ public class LFComms {
     }
 
 
-    private synchronized void triggerSuccessors(RealAgent a){
+    //
+    private synchronized void setSuccessors(RealAgent a, LFState newState){
         for(int i = agentToIndex.get(a); i < agentStates.size(); i++){
-            agentStates.set(i, LFState.GoingToFrontier);
+            agentStates.set(i, newState);
         }
-
     }
 
     public synchronized boolean isPositionOkay(RealAgent a, Point p){
@@ -216,6 +230,10 @@ public class LFComms {
         }
 
 
+    }
+
+    public synchronized boolean isPositionOkay(int range, Point a, Point b){
+        return PropModel1.isConnected(baseStation.getOccupancyGrid(), range, a,b);
     }
 
     // Boilerplate code to find the frontiers
@@ -237,6 +255,7 @@ public class LFComms {
 
     }
 
+
     private void newPaths(){
         calculateFrontiers();
 
@@ -254,7 +273,7 @@ public class LFComms {
                 a.getPath().setInvalid();
             }
             // this should give each agent the same path
-            a.setPath(baseStation.calculatePath(f.getCentre(), false));
+            a.setPath(baseStation.calculatePath(f.getCentre(), true));
         });
     }
 
@@ -264,7 +283,7 @@ public class LFComms {
             if(a.getPath() != null){
                 a.getPath().AlecReverse();
             } else{
-                a.setPath(a.calculatePath(baseStation.getLocation(), false));
+                a.setPathToBaseStation(true);
             }
 
         });
@@ -291,4 +310,58 @@ public class LFComms {
      * A good start to doing this is to iterate along each path at the same time and check if both points are in range
      * As soon as one is not, we set all
      */
+
+    /**
+     * Given a path from the base station, find the points that each robot will stop on.
+     * @param p Path to check
+     * @return List of agent positions on p
+     */
+    private synchronized List<Point> findAgentPositions(Path p){
+        assert p.getStartPoint() == baseStation.getLocation();
+
+        List<Point> output = new ArrayList<>(agentToIndex.size());
+        Point prev = p.getStartPoint(); // should always be the base station
+        int agentI = 0;
+        int range = indexToAgent.get(agentI).getCommRange();
+        int index = 0;
+        while(agentToIndex.get(leader) >= agentI){
+            // iterate over all points
+            for(;index < p.getPoints().size(); index++){
+                // if the next point is out of range, this point must be where the agent stops
+                if(!isPositionOkay(range, prev, p.getPoints().get(index+1))){
+                    prev = p.getPoints().get(index);
+                    output.add(prev);
+                    agentI++;
+                    range = indexToAgent.get(agentI).getCommRange();
+                }
+            }
+        }
+        return output;
+    }
+
+    //TODO: For each agent, plan a path to its point on the new path and check that they all work
+
+    /**
+     * Checks if b can be traversed while maintaining connection to an agent traversing a
+     * We assume a can be traversed while maintaining connection to its previous path
+     * (Exact order of a and b doesn't actually matter)
+    **/
+    private synchronized boolean checkPaths(double range, Path a, Path b){
+        int aI = 0;
+        int bI = 0;
+        while(aI < a.getPoints().size() || bI < b.getPoints().size()){
+
+            if(!PropModel1.isConnected(baseStation.getOccupancyGrid(), range, a.getPoints().get(aI), b.getPoints().get(bI))){
+                return false;
+            }
+
+            if(aI < a.getPoints().size()-1){
+                aI++;
+            }
+            if(bI < b.getPoints().size()-1){
+                bI++;
+            }
+        }
+        return true;
+    }
 }
