@@ -11,7 +11,6 @@ import java.awt.*;
 public class RoleAlec extends FrontierAlec{
 
     private static final int RETURN_TIMER_DEFAULT = 50;
-
     private static final State INITIAL_STATE = State.RunningToRelay;
     private static final int COMMUNICATION_TIMEOUT = 10;
 
@@ -44,6 +43,7 @@ public class RoleAlec extends FrontierAlec{
      */
     public RoleAlec(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
         super(agent, simConfig, initialState);
+        super.disableTimer();
         agent.announce("Initiated Role-Based");
 
         returnTimer = RETURN_TIMER_DEFAULT;
@@ -107,7 +107,7 @@ public class RoleAlec extends FrontierAlec{
         }
 
 
-        // If relay is met while exploring, we may as well skip the going to the rendezvous point and find a new one
+        // If relay is met while exploring, we may as well skip going to the rendezvous point and find a new one
         if(agent.getTeammate(partnerNumber).hasCommunicationLink() && timeSinceLastComm >= COMMUNICATION_TIMEOUT){
             return meetRendezvous(timeElapsed);
         }
@@ -120,7 +120,7 @@ public class RoleAlec extends FrontierAlec{
 
         if(agent.getEnvError()){
             exactPath = true;
-            dealWithEnvError();
+            agent.setPathInvalid();
         }
 
         if(agent.getPath() == null){
@@ -137,7 +137,7 @@ public class RoleAlec extends FrontierAlec{
 
         // Can now switch to "RunningToRelay"
         if(agent.getTeammateByNumber(SimConstants.BASE_STATION_TEAMMATE_ID).hasCommunicationLink()){
-            agent.getPath().setInvalid();
+            agent.setPathInvalid();
             agent.setPath(agent.calculatePath(comm.getRendezvous(), false));
             agentState = State.RunningToRelay;
             return takeStep_RunningToRelay(timeElapsed);
@@ -169,7 +169,7 @@ public class RoleAlec extends FrontierAlec{
         } // Shouldn't get triggered
 
         if(agent.getEnvError()){
-            dealWithEnvError();
+            agent.setPathInvalid();
             exactPath = true;
         }
 

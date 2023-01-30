@@ -107,28 +107,9 @@ public class LFComms {
             case GoingHome:
                 return goingHome(a);
             case WaitAtBS:
-                a.announce("Waiting at Base");
-                if(allInState(LFState.WaitAtBS)){
-                    agentToIndex.keySet().forEach(agent -> setState(agent, LFState.GoingToFrontier));
-                    leader.addBadFrontier(f);
-                    newPaths();
-                }
-                return a.stay();
-
+                return waitAtBase(a);
             case GoingToFrontier:
-                a.announce("Going to Frontier");
-                next = a.getNextPathPoint();
-
-                if(isPositionOkay(a, next) && !a.getPath().isFinished()){
-                    // If a has moved forward, its successors may be able to move now
-                    setSuccessors(a, LFState.GoingToFrontier);
-                    return next;
-                } else{
-                    // assume that this means the robot is as far as it can go
-                    a.getPath().resetStep();
-                    setState(a, LFState.WaitInChain);
-                    return a.stay();
-                }
+                return goingToFrontier(a);
             case WaitInChain:
                 a.announce("Waiting in Chain");
                 if(allInState(LFState.WaitInChain)){
@@ -157,9 +138,7 @@ public class LFComms {
 
         if(a.getLocation().equals(baseStation.getLocation())){
             a.announce("Reached Base");
-            if(a.getPath() != null){
-                a.getPath().setInvalid();
-            }
+            a.setPathInvalid();
             setState(a, LFState.WaitAtBS);
             return a.stay();
         }
@@ -184,6 +163,34 @@ public class LFComms {
         } else{
             a.announce("Position Not Okay");
             a.getPath().resetStep();
+            return a.stay();
+        }
+    }
+
+    private synchronized Point waitAtBase(RealAgent a){
+        a.announce("Waiting at Base");
+
+        if(allInState(LFState.WaitAtBS)){
+            agentToIndex.keySet().forEach(agent -> setState(agent, LFState.GoingToFrontier));
+            leader.addBadFrontier(f);
+            newPaths();
+        }
+
+        return a.stay();
+    }
+
+    private synchronized Point goingToFrontier(RealAgent a){
+        a.announce("Going to Frontier");
+        Point next = a.getNextPathPoint();
+
+        if(isPositionOkay(a, next) && !a.getPath().isFinished()){
+            // If a has moved forward, its successors may be able to move now
+            setSuccessors(a, LFState.GoingToFrontier);
+            return next;
+        } else{
+            // assume that this means the robot is as far as it can go
+            a.getPath().resetStep();
+            setState(a, LFState.WaitInChain);
             return a.stay();
         }
     }
@@ -269,11 +276,9 @@ public class LFComms {
         f = frontiers.poll();
 
         agentToIndex.keySet().forEach(a -> {
-            if(a.getPath() != null){
-                a.getPath().setInvalid();
-            }
+            a.setPathInvalid();
             // this should give each agent the same path
-            a.setPath(baseStation.calculatePath(f.getCentre(), true));
+            a.setPath(baseStation.calculateAStarPath(f.getCentre(), true));
         });
     }
 

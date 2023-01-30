@@ -301,6 +301,12 @@ public class RealAgent extends Agent {
         }
     }
 
+    public void setPathInvalid(){
+        if(path != null){
+            path.setInvalid();
+        }
+    }
+
     public void setSimFramework(SimulationFramework simFramework) {
         this.simFramework = simFramework;
     }
@@ -442,7 +448,7 @@ public class RealAgent extends Agent {
             occGrid.setMapHasChangedToFalse();
         }
         //In this situation it might be a good idea to reset bad frontiers
-        resetBadFrontiers();
+        //resetBadFrontiers();
     }
 
 // Flush, take step, write step
@@ -635,6 +641,10 @@ public class RealAgent extends Agent {
      */
     public Path calculatePath(Point goalPoint, boolean exact) {
         return calculatePath(this.getLocation(), goalPoint, false, exact);
+    }
+
+    public Path calculateAStarPath(Point goalPoint, boolean exact) {
+        return calculatePath(this.getLocation(), goalPoint, true, exact);
     }
 
     public Path calculatePath(Point startPoint, Point goalPoint, boolean pureAStar, boolean exact) {
