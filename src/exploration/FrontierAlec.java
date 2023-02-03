@@ -3,7 +3,6 @@ package exploration;
 import agents.Agent;
 import agents.RealAgent;
 import agents.TeammateAgent;
-import config.RobotConfig;
 import config.SimConstants;
 import config.SimulatorConfig;
 import environment.ContourTracer;
@@ -19,10 +18,10 @@ import java.util.stream.Stream;
 public class FrontierAlec extends BasicExploration implements Exploration{
 
     private static final boolean EXACT_PATH = true;
+    private static final int COMMUNICATIONS_FLUSH_TIMER = 10;
     private static int RETURN_TIMER = 100;
     private boolean timerEnabled = true;
     private int timer = 0;
-
 
 
     private enum State{
@@ -34,10 +33,8 @@ public class FrontierAlec extends BasicExploration implements Exploration{
 
     PriorityQueue<Frontier> frontiers = new PriorityQueue<>();
     Point destination = null;
-    boolean exactPath = false;
-
-    Frontier tempBad = null;
-    HashSet<Integer> oldComms = new HashSet<>();
+    Frontier frontierTarget = null;
+    HashSet<Integer> comms = new HashSet<>();
 
 
     /**
@@ -78,20 +75,27 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             timer++;
         }
 
+        if(timeElapsed % COMMUNICATIONS_FLUSH_TIMER == 0){
+            comms.clear();
+        }
+
+        if(agent.isMissionComplete()){
+            agent.setPathToBaseStation(EXACT_PATH);
+            agent.announce("Mission over, going back to base station");
+            state = State.RETURN;
+            return agent.getNextPathPoint();
+        }
+
         // Checks if the robot has begun communicating with another robot
         // This check is important as this signals that new data has been received
         AtomicBoolean newComm = new AtomicBoolean(false);
 
-        HashSet<Integer> newComms = new HashSet<>();
         getCommunications()
                 .forEach(a ->
                 {
-                    newComm.set(newComm.get() || !oldComms.contains(a.getRobotNumber()));
-                    newComms.add(a.getRobotNumber());
+                    newComm.set(newComm.get() || !comms.contains(a.getRobotNumber()));
+                    comms.add(a.getRobotNumber());
                 });
-
-        oldComms = newComms;
-
         // if there has been a new communication, reset variables
         if(newComm.get()){
             agent.announce("New Communication, resetting");
@@ -105,33 +109,35 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         if(agent.getEnvError()){
             agent.setEnvError(false);
             agent.setPathInvalid();
-            agent.addBadFrontier(tempBad);
+            agent.addBadFrontier(frontierTarget);
             agent.setPath(null);
             destination = null;
         }
 
         if(agent.getPath() != null && !agent.getPath().isFinished()){
+            agent.resetBadFrontiers();
             return agent.getNextPathPoint();
         }
 
-        chooseFrontier(getCommunications(), agent.getRobotNumber());
+        chooseFrontier();
 
         if(destination != null && !agent.isMissionComplete()){
             agent.announce("New Destination: ".concat(destination.toString()));
             agent.setPath(agent.calculatePath(destination,EXACT_PATH));
-            if(agent.getPath() == null || !agent.getPath().found || !agent.getPath().isValid()){
-                agent.addBadFrontier(tempBad);
-                agent.announce("Added to bad frontiers: ".concat(tempBad.toString()));
+            while(agent.getPath() == null || !agent.getPath().found || !agent.getPath().isValid()){
+                agent.addBadFrontier(frontierTarget);
+                agent.announce("Added to bad frontiers: ".concat(frontierTarget.toString()));
                 destination = null;
-                agent.setEnvError(true);
-                return agent.stay();
+                chooseFrontier();
+                agent.setPath(agent.calculatePath(destination,EXACT_PATH));
             }
 
             return agent.getNextPathPoint();
         } else {
             disableTimer();
             agent.setPathToBaseStation(EXACT_PATH);
-            agent.announce("Mission over, going back to base station");
+            agent.announce("Out of Frontiers, going back to base station");
+            state = State.RETURN;
             return agent.getNextPathPoint();
         }
     }
@@ -141,7 +147,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         if(agent.getTeammateByNumber(SimConstants.BASE_STATION_TEAMMATE_ID).hasCommunicationLink()){
             agent.setPathInvalid();
             state = State.EXPLORE;
-            calculateFrontiers();
+            chooseFrontier();
             agent.setPath(agent.calculatePath(destination, EXACT_PATH));
 
             return takeStep_explore(timeElapsed);
@@ -155,14 +161,14 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         return agent.getNextPathPoint();
     }
 
-    protected void chooseFrontier(Stream<TeammateAgent> communications, int robotNumber){
+    protected void chooseFrontier(){
         // if we don't know where to go, or have reached our destination, choose a new one.
         if (destination == null || agent.getLocation().equals(destination)) {
             // figure out the options
             calculateFrontiers();
 
             // figure out which option we choose
-            long index = communications.filter(a -> a.getRobotNumber() < robotNumber)
+            long index = getCommunications().filter(a -> a.getRobotNumber() < agent.getRobotNumber())
                     .count();
 
             // choose the option
@@ -176,7 +182,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             for(int i = 0; i < index; i++){
                 frontier = frontiers.poll();
             }
-            tempBad = frontier;
+            frontierTarget = frontier;
             if(frontier == null){
                 // should only occur if the frontier list is empty, which tells us we need to go back to the base
                 destination = agent.baseStation.getLocation();
@@ -199,21 +205,16 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         // convert the contours to frontiers, and filter out all those that are invalid
         for (LinkedList<Point> contour : contours) {
             Frontier frontier = new Frontier(agent.getX(), agent.getY(), contour);
-            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !agent.isBadFrontier(frontier) && frontier != tempBad){
+            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !agent.isBadFrontier(frontier) && frontier != frontierTarget){
                 frontiers.add(frontier);
             }
         }
-
-    }
-
-    public PriorityQueue<Frontier> getFrontiers() {
-        return frontiers;
     }
 
 
     protected Stream<TeammateAgent> getCommunications(){
         return agent.getAllTeammates().values().stream()
-                .filter(TeammateAgent::hasCommunicationLink).filter(a -> a.getRole() == RobotConfig.roletype.Explorer);
+                .filter(TeammateAgent::hasCommunicationLink).filter(t -> t.getRobotNumber() != agent.baseStation.getRobotNumber());
     }
 
     protected void disableTimer(){

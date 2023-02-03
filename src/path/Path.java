@@ -1071,4 +1071,11 @@ public class Path {
     public boolean getExact() {
         return this.exact;
     }
+
+    public Point getMidpoint(){
+        if(pathPoints.size() <= 1){
+            return startPoint;
+        }
+        return pathPoints.get(pathPoints.size()/2);
+    }
 }

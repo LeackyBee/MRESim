@@ -77,7 +77,7 @@ public class SimConstants {
     public static final int RANDOM_SEED = 12345;
 
     /**
-     * Max time to search for a path, in ms.
+     * Max time to search for a path, in ms. Default 500
      */
     public static final int MAX_PATH_SEARCH_TIME = 500;
 
