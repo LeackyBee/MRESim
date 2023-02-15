@@ -973,6 +973,10 @@ public class Path {
         alecDone = false;
     }
 
+    public void budge(Point p){
+        currentPoint = pathPoints.indexOf(p);
+    }
+
     /**
      * New method to use paths: create path and walk through it by iterator nextPoint.
      *
@@ -1024,7 +1028,11 @@ public class Path {
     }
 
     public boolean isFinished() {
-        return alecDone || alecReverse ? currentPoint <= 0 : currentPoint >= pathPoints.size() - 1;
+        return alecReverse ? currentPoint <= 0 : currentPoint >= pathPoints.size() - 1;
+    }
+
+    public boolean isAlecDone(){
+        return alecDone;
     }
 
     public void resetStep() {

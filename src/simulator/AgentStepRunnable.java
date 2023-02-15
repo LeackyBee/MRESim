@@ -145,7 +145,7 @@ public class AgentStepRunnable implements Runnable {
             agent.flush();
 
             //Conditions for breaking even if we have 'speed' left
-            boolean canContinueOnPath = (agent.getPath() != null) && !agent.getPath().isFinished() && (agent.getPath().getPoints() != null)
+            boolean canContinueOnPath = (agent.getPath() != null) && (!agent.getPath().isAlecDone()) && !agent.getPath().isFinished() && (agent.getPath().getPoints() != null)
                     && (agent.getPath().getPoints().size() > 0) && (!agent.getEnvError());
             if (!canContinueOnPath) {
                 agent.announce("Cannot continue path");
@@ -157,8 +157,12 @@ public class AgentStepRunnable implements Runnable {
                     agent.announce("due to null points");
                 } else if(agent.getPath().getPoints().size() <= 0){
                     agent.announce("due to no points");
-                } else{
+                } else if(agent.getEnvError()){
                     agent.announce("due to env error");
+                } else if(agent.getPath().isAlecDone()){
+                    agent.announce("due to alec done");
+                } else{
+                    agent.announce("what");
                 }
                 break;
             }

@@ -33,7 +33,6 @@ public class LFComms {
     }
 
     private boolean begun = false;
-
     private static LFComms singleton;
     private RealAgent baseStation;
     private RealAgent leader = null;
@@ -50,6 +49,8 @@ public class LFComms {
     private Point predPoint;
     private int predId;
 
+    private final List<Path> agentBSPaths;
+
 
     private final PriorityQueue<Frontier> frontiers;
     private Frontier f;
@@ -60,6 +61,7 @@ public class LFComms {
         frontiers = new PriorityQueue<>();
         agentStates = new ArrayList<>();
         agentPoints = new ArrayList<>();
+        agentBSPaths = new ArrayList<>();
     }
 
     //                            Initialisation Methods
@@ -156,7 +158,7 @@ public class LFComms {
             a.announce("Moving");
             Collections.fill(agentStates, State.MovingToPoint);
             leader.addBadFrontier(f); // add this to avoid replanning to out-of-reach frontiers
-            newPaths(a);
+            newPaths();
             return movingToPoint(a);
         } else{
             return a.stay();
@@ -165,7 +167,7 @@ public class LFComms {
     private synchronized Point waitingInChain(RealAgent a){
         a.announce("Waiting in Chain");
         if(allInState(State.WaitInChain)){
-            newPaths(a);
+            newPaths();
             return getNextPosition(a);
         } else{
             return a.stay();
@@ -296,7 +298,7 @@ public class LFComms {
     // Step 5) Check each path can be followed while maintaining connection to previous agent
     // Step 6) If a path is not, the agent and all agents past it must return to the previous one
 
-    private synchronized void newPaths(RealAgent a){
+    private synchronized void newPaths(){
         baseStation.announce("Triggered newPaths()");
         // Step 1)
         calculateFrontiers();
@@ -310,11 +312,12 @@ public class LFComms {
 
         // In this algorithm we actually want to poll the frontier closest to the leader, since each exploration requires
         // a lot of coordination. By choosing the frontier closest to the leader we will generally not need to move the chain as much
-        f = frontiers.stream().min((f1, f2) -> (int) (f2.getCentre().distance(leader.getLocation()) - f1.getCentre().distance(leader.getLocation()))).get();
+        f = frontiers.stream().min((f1, f2) -> (int) (f1.getCentre().distance(leader.getLocation()) - f2.getCentre().distance(leader.getLocation()))).get();
 
         baseStation.announce(f.toString());
         // Step 2)
         Path p = baseStation.calculateAStarPath(f.getCentre(),false);
+        agentBSPaths.replaceAll(ignore -> baseStation.calculateAStarPath(f.getCentre(),false));
 
         // Step 3)
         agentPoints = findAgentPositions(p);
@@ -354,10 +357,8 @@ public class LFComms {
                 setSuccessors(indexToAgent.get(i), State.MovingToPredecessor);
                 for(int j = i; j < agentToIndex.size(); j++){
                     baseStation.announce("Agent ".concat(String.valueOf(j).concat( ") Path is not okay")));
-                    RealAgent agent = indexToAgent.get(j);
-                    agent.setPath(agent.calculatePath(predPoint, true));
-                    //indexToAgent.get(j).getPath().AlecReverse();
-                    //indexToAgent.get(j).getPath().setAlecFinish(predPoint);
+                    indexToAgent.get(j).getPath().AlecReverse();
+                    indexToAgent.get(j).getPath().setAlecFinish(predPoint);
                 }
                 break;
             }
@@ -368,7 +369,11 @@ public class LFComms {
         baseStation.announce("Triggered goHome()");
         agentToIndex.keySet().forEach(a -> {
             setState(a, State.GoingHome);
-            a.setPath(a.calculateAStarPath(baseStation.getLocation(), true));
+            if(a.getPath() != null){
+                a.getPath().AlecReverse();
+            } else {
+                a.setPath(a.calculateAStarPath(baseStation.getLocation(), true));
+            }
         });
     }
 

@@ -61,7 +61,6 @@ public class RoleAlec extends BasicExploration implements Exploration{
         } else{
             partnerNumber = agent.getChild();
             comm = RoleComms.getCommunication(partnerNumber);
-
         }
         comm.setRendezvous(agent.baseStation.getLocation());
     }
@@ -247,6 +246,7 @@ public class RoleAlec extends BasicExploration implements Exploration{
                 agent.announce("Added to bad frontiers: ".concat(frontierTarget.toString()));
                 destination = null;
                 chooseFrontier();
+                // TODO: if frontiers == empty, exit
                 agent.setPath(agent.calculatePath(destination,EXACT_PATH));
             }
 

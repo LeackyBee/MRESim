@@ -234,7 +234,6 @@ public class SimulationFramework implements ActionListener {
 
     public boolean simulationCycle() {
         System.out.println();
-        System.out.println("Timestep: ".concat(String.valueOf(timeElapsed)));
         // only run at start
         if (timeElapsed == 0) {
             try {
@@ -276,6 +275,8 @@ public class SimulationFramework implements ActionListener {
 
         // Move agents
         agentSteps();
+
+        System.out.println("Timestep: ".concat(String.valueOf(timeElapsed)));
 
         // Update data
         if (timeElapsed % SimConstants.UPDATE_AGENT_KNOWLEDGE_INTERVAL == 0) {
