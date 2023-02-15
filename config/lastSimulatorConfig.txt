@@ -1,4 +1,4 @@
-FrontierExploration
+LeaderFollower
 PeriodicReturn
 RangeBorder
 null

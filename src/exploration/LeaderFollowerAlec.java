@@ -10,7 +10,6 @@ import java.awt.*;
 public class LeaderFollowerAlec extends BasicExploration implements Exploration{
 
     LFComms comms;
-    Point next;
 
 
     /**
@@ -23,7 +22,6 @@ public class LeaderFollowerAlec extends BasicExploration implements Exploration{
     public LeaderFollowerAlec(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
         super(agent, simConfig, initialState);
         comms = LFComms.register(agent);
-        next = null;
     }
 
     @Override
@@ -33,12 +31,12 @@ public class LeaderFollowerAlec extends BasicExploration implements Exploration{
 
     @Override
     public Point takeStep(int timeElapsed) {
-        agent.flushLog();
+
         if(timeElapsed == 0){
             // This exists so that the agents can gather information and transmit to the base station for planning
+            // If we ignore this we get null paths
             return agent.stay();
         }
-
         return comms.getNextPosition(agent);
     }
 }

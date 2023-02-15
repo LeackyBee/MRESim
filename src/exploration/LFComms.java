@@ -11,18 +11,24 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 
+
+// TODO: Dynamic chain
+// Instead of checking if the position is in range of the predecessor and successor, check that it maintains connection with base station
+// how?
+// Check that another agent exists that has a BS connection, if there is we can move (assuming we're not as far in the path)
 public class LFComms {
 
-    private static final LFState START_STATE = LFState.GoingHome;
+    private static final State START_STATE = State.Initial;
 
-    private enum LFState {
+    private enum State {
+        Initial, // first state to make them stay
         GoingHome, // Obvious
         GoingToFrontier, // Obvious
         WaitForSuccessors, // Used when chain is reforming
         MovingToPredecessor, // Used when chain is reforming
-        WaitAtBS, // Waiting at the base station for the rest of the team (POC)
+        WaitAtBS, // Waiting at the base station for the rest of the team
         WaitInChain, // Waiting in the chain as they cannot move forward
-        MovingToPoint, // Moving from last chain point to new chain point
+        MovingToPoint, // Moving between chains
 
     }
 
@@ -33,17 +39,16 @@ public class LFComms {
     private RealAgent leader = null;
 
 
-
     // Links each robot to its index in the chain
     private final Map<RealAgent, Integer> agentToIndex;
     private final Map<Integer, RealAgent> indexToAgent;
 
 
-
-
     // Each state s_i represents the state of robot i
-    private final List<LFState> agentStates;
-
+    private final List<State> agentStates;
+    private List<Point> agentPoints;
+    private Point predPoint;
+    private int predId;
 
 
     private final PriorityQueue<Frontier> frontiers;
@@ -54,14 +59,23 @@ public class LFComms {
         indexToAgent = new HashMap<>();
         frontiers = new PriorityQueue<>();
         agentStates = new ArrayList<>();
+        agentPoints = new ArrayList<>();
     }
 
     //                            Initialisation Methods
 
-    // Assign the robot a placeholder index, as we don't know if all robots have been registered yet
+    /**
+     *  Assign the robot a placeholder index, as we don't know if all robots have been registered yet
+     */
     private void addRobot(RealAgent a){
         agentToIndex.put(a,0);
     }
+
+    /**
+     * Registers a robot to participate in the Leader-Follower Algorithm
+     * @param a Agent
+     * @return LFComms singleton
+     */
     public synchronized static LFComms register(RealAgent a){
         a.announce("Registered");
         if(singleton == null){
@@ -72,9 +86,11 @@ public class LFComms {
         return singleton;
     }
 
-    // Once we know all the robots that are participating, we assign them all indices
-    // These indices are universal for all the lists the robot will access in this class
-    // This will also find which agent should be the leader, which is important for finding frontiers
+    /**
+     * Once we know all the robots that are participating, we assign them all indices.
+     * These indices are universal for all the lists the robot will access in this class.
+     * This will also find which agent should be the leader, which is important for finding frontiers.
+      */
     private void assignIndices(){
         List<RealAgent> agents = new ArrayList<>(agentToIndex.keySet());
         agents.sort(Comparator.comparingInt(RealAgent::getRobotNumber));
@@ -86,7 +102,6 @@ public class LFComms {
             indexToAgent.put(i, agents.get(i));
             agentStates.add(START_STATE);
         }
-
     }
 
 
@@ -94,16 +109,21 @@ public class LFComms {
 
     //                  Next Step Method
 
-    // Gives agents their paths and checks if they need new ones
+    /**
+     * Leader-Follower Algorithm entry method
+     * @param a Agent
+     * @return Next Point
+     */
     public synchronized Point getNextPosition(RealAgent a){
         if(!begun){
             a.announce("Initiated Algorithm");
             assignIndices();
             begun = true;
         }
-        Point next;
 
-        switch (agentStates.get(agentToIndex.get(a))){
+        switch (getState(a)){
+            case Initial:
+                return initial(a);
             case GoingHome:
                 return goingHome(a);
             case WaitAtBS:
@@ -111,48 +131,72 @@ public class LFComms {
             case GoingToFrontier:
                 return goingToFrontier(a);
             case WaitInChain:
-                a.announce("Waiting in Chain");
-                if(allInState(LFState.WaitInChain)){
-                    goHome();
-                    agentToIndex.keySet().forEach(agent -> setState(agent, LFState.GoingHome));
-                    return getNextPosition(a);
-                } else{
-                    return a.stay();
-                }
+                return waitingInChain(a);
             case WaitForSuccessors:
-                a.announce("Waiting for Successors?");
-                return a.stay();
+                return waitingForSuccessors(a);
             case MovingToPredecessor:
-                a.announce("Moving to Predecessors");
-                break;
+                return movingToPredecessor(a);
             case MovingToPoint:
-                break;
+                return movingToPoint(a);
         }
 
         return a.stay();
-
     }
 
+    //   Waiting methods
+    private synchronized Point initial(RealAgent a){
+        setState(a, State.GoingHome);
+        return a.stay();
+    }
+
+    private synchronized Point waitAtBase(RealAgent a){
+        a.announce("Waiting at Base");
+
+        if(allInState(State.WaitAtBS)){
+            a.announce("Moving");
+            Collections.fill(agentStates, State.MovingToPoint);
+            leader.addBadFrontier(f); // add this to avoid replanning to out-of-reach frontiers
+            newPaths(a);
+            return movingToPoint(a);
+        } else{
+            return a.stay();
+        }
+    }
+    private synchronized Point waitingInChain(RealAgent a){
+        a.announce("Waiting in Chain");
+        if(allInState(State.WaitInChain)){
+            newPaths(a);
+            return getNextPosition(a);
+        } else{
+            return a.stay();
+        }
+    }
+    private synchronized Point waitingForSuccessors(RealAgent a){
+        a.announce("Waiting for Successors");
+        if(allInState(State.WaitForSuccessors)){
+            Collections.fill(agentStates, State.MovingToPoint);
+            return movingToPoint(a);
+        } else{
+            return a.stay();
+        }
+    }
+
+
+    //     Movement Methods
     private synchronized Point goingHome(RealAgent a){
         a.announce("Going Home");
 
         if(a.getLocation().equals(baseStation.getLocation())){
             a.announce("Reached Base");
             a.setPathInvalid();
-            setState(a, LFState.WaitAtBS);
+            setState(a, State.WaitAtBS);
             return a.stay();
         }
 
-        // Ensures that the agents all go to the base station immediately
         // Should only be called in the first timestep
-        if(a.getPath() == null){
+        if(a.getPath() == null || !a.getPath().isValid() || a.getPath().isFinished()){
             a.announce("Path null");
-            a.setPathToBaseStation(true);
-        }
-
-
-        if(a.getPath().getIndex() == 0){
-            return baseStation.getLocation();
+            a.setPath(a.calculateAStarPath(getPredecessor(a).getLocation(), true));
         }
 
         Point next = a.getNextPathPoint();
@@ -167,83 +211,65 @@ public class LFComms {
         }
     }
 
-    private synchronized Point waitAtBase(RealAgent a){
-        a.announce("Waiting at Base");
-
-        if(allInState(LFState.WaitAtBS)){
-            agentToIndex.keySet().forEach(agent -> setState(agent, LFState.GoingToFrontier));
-            leader.addBadFrontier(f);
-            newPaths();
-        }
-
-        return a.stay();
-    }
-
     private synchronized Point goingToFrontier(RealAgent a){
         a.announce("Going to Frontier");
         Point next = a.getNextPathPoint();
 
         if(isPositionOkay(a, next) && !a.getPath().isFinished()){
             // If a has moved forward, its successors may be able to move now
-            setSuccessors(a, LFState.GoingToFrontier);
+            setSuccessors(a, State.GoingToFrontier);
             return next;
         } else{
             // assume that this means the robot is as far as it can go
             a.getPath().resetStep();
-            setState(a, LFState.WaitInChain);
-            return a.stay();
+            setState(a, State.WaitInChain);
+            return waitingInChain(a);
         }
     }
 
+    private synchronized Point movingToPredecessor(RealAgent a){
+        a.announce("Moving to Predecessors");
 
-
-    public LFState getState(RealAgent a){
-        return agentStates.get(agentToIndex.get(a));
-    }
-
-    public synchronized void setState(RealAgent a, LFState newState){
-        agentStates.set(agentToIndex.get(a), newState);
-    }
-
-
-    private synchronized boolean allInState(LFState target){
-        for(LFState state : agentStates){
-            if(state != target){
-                return false;
-            }
-        }
-        return true;
-    }
-
-
-    //
-    private synchronized void setSuccessors(RealAgent a, LFState newState){
-        for(int i = agentToIndex.get(a); i < agentStates.size(); i++){
-            agentStates.set(i, newState);
-        }
-    }
-
-    public synchronized boolean isPositionOkay(RealAgent a, Point p){
-        RealAgent prevChain = indexToAgent.get(agentToIndex.get(a)-1);
-        if(a == leader){
-            // the leader has no successor
-            return PropModel1.isConnected(baseStation.getOccupancyGrid(), prevChain.getCommRange(), p, prevChain.getLocation());
+        if(a.getLocation().equals(predPoint)){
+            setState(a, State.WaitForSuccessors);
+            a.setPath(a.calculateAStarPath(agentPoints.get(predId), true)); // we can assume this will be the same as the path the original agent planned
+            return waitingForSuccessors(a);
         } else{
-            // check if the point we can go to is viable for communication from both the predecessor and successor
-            RealAgent nextChain = indexToAgent.get(agentToIndex.get(a) + 1);
-            return PropModel1.isConnected(baseStation.getOccupancyGrid(), prevChain.getCommRange(), p, prevChain.getLocation())
-                    &&
-                    PropModel1.isConnected(baseStation.getOccupancyGrid(), a.getCommRange(), p, nextChain.getLocation());
+            return a.getNextPathPoint();
+        }
+    }
+
+    private synchronized Point movingToPoint(RealAgent a){
+        a.announce("Moving to Point");
+        assert a.getPath() != null;
+
+        if(a.getLocation().equals(getPoint(a))){
+            setState(a, State.WaitInChain);
+            return waitingInChain(a);
+        } else{
+            while(!a.getPath().isValid()){
+                a.announce("Path invalid");
+                a.setPath(a.calculatePath(getPoint(a),true));
+            }
+
+            if(a.getPath().isFinished()){
+                // transition from moving between chains to moving up the chain
+                a.announce("Switching to new path");
+                a.setPathInvalid();
+                a.setPath(a.calculateAStarPath(getPoint(a), true));
+            }
+
+            return a.getNextPathPoint();
         }
 
-
     }
 
-    public synchronized boolean isPositionOkay(int range, Point a, Point b){
-        return PropModel1.isConnected(baseStation.getOccupancyGrid(), range, a,b);
-    }
 
-    // Boilerplate code to find the frontiers
+    //               Path Switching
+
+    /**
+     * Boilerplate code to find the frontiers
+     */
     private void calculateFrontiers(){
         // Set the old list of frontiers to dirty, and clear the queue
         // this "dirtying" is for rendering, and so isn't strictly needed
@@ -263,58 +289,89 @@ public class LFComms {
     }
 
 
-    private void newPaths(){
+    // Step 1) Get new frontier
+    // Step 2) Get path to new frontier
+    // Step 3) Calculate agent points on this path
+    // Step 4) Get path from each agent to this new point
+    // Step 5) Check each path can be followed while maintaining connection to previous agent
+    // Step 6) If a path is not, the agent and all agents past it must return to the previous one
+
+    private synchronized void newPaths(RealAgent a){
+        baseStation.announce("Triggered newPaths()");
+        // Step 1)
         calculateFrontiers();
 
-        // exploration is over
-        if(frontiers.isEmpty()){
+
+        if(frontiers.isEmpty()){ // exploration is over
+            baseStation.announce("Empty Frontiers List");
             goHome();
             return;
         }
 
-        // frontiers is a priority queue, so we poll the head and plan a path from the base station
-        f = frontiers.poll();
+        // In this algorithm we actually want to poll the frontier closest to the leader, since each exploration requires
+        // a lot of coordination. By choosing the frontier closest to the leader we will generally not need to move the chain as much
+        f = frontiers.stream().min((f1, f2) -> (int) (f2.getCentre().distance(leader.getLocation()) - f1.getCentre().distance(leader.getLocation()))).get();
 
-        agentToIndex.keySet().forEach(a -> {
-            a.setPathInvalid();
-            // this should give each agent the same path
-            a.setPath(baseStation.calculateAStarPath(f.getCentre(), true));
-        });
+        baseStation.announce(f.toString());
+        // Step 2)
+        Path p = baseStation.calculateAStarPath(f.getCentre(),false);
+
+        // Step 3)
+        agentPoints = findAgentPositions(p);
+        baseStation.announce(agentPoints.toString());
+        List<Path> paths = new ArrayList<>();
+
+        // Step 4)
+        for(int i = 0; i < agentToIndex.keySet().size(); i++){
+            paths.add(indexToAgent.get(i).calculateAStarPath(agentPoints.get(i), false));
+        }
+        baseStation.announce(paths.toString());
+
+        // Step 5)
+         // Base case: First path against base station
+        if(!checkPathAgainstPoint(indexToAgent.get(0).getCommRange(), baseStation.getLocation(), paths.get(0))){
+            baseStation.announce("Agent ".concat(String.valueOf(0).concat( ") Path is not okay")));
+            goHome();
+            return;
+        } else {
+            baseStation.announce("Agent ".concat(String.valueOf(0).concat( ") Path is okay")));
+            indexToAgent.get(0).setPathInvalid();
+            indexToAgent.get(0).setPath(paths.get(0));
+            setState(indexToAgent.get(0), State.WaitForSuccessors);
+        }
+
+         // Recursive case: Each path against the last one
+        for(int i = 1; i < paths.size(); i++){
+            if(checkPaths(baseStation.getCommRange(), paths.get(i-1), paths.get(i))){
+                System.out.println("Agent ".concat(String.valueOf(i).concat( ") Path is okay")));
+                indexToAgent.get(i).setPathInvalid();
+                indexToAgent.get(i).setPath(paths.get(i));
+                setState(indexToAgent.get(i), State.WaitForSuccessors);
+            } else{
+                // Step 6
+                predPoint = indexToAgent.get(i-1).getLocation();
+                predId = i-1;
+                setSuccessors(indexToAgent.get(i), State.MovingToPredecessor);
+                for(int j = i; j < agentToIndex.size(); j++){
+                    baseStation.announce("Agent ".concat(String.valueOf(j).concat( ") Path is not okay")));
+                    RealAgent agent = indexToAgent.get(j);
+                    agent.setPath(agent.calculatePath(predPoint, true));
+                    //indexToAgent.get(j).getPath().AlecReverse();
+                    //indexToAgent.get(j).getPath().setAlecFinish(predPoint);
+                }
+                break;
+            }
+        }
     }
 
     private void goHome(){
+        baseStation.announce("Triggered goHome()");
         agentToIndex.keySet().forEach(a -> {
-            a.announce("Going home");
-            if(a.getPath() != null){
-                a.getPath().AlecReverse();
-            } else{
-                a.setPathToBaseStation(true);
-            }
-
+            setState(a, State.GoingHome);
+            a.setPath(a.calculateAStarPath(baseStation.getLocation(), true));
         });
     }
 
-
-    // Path checking algo:
-    // Intuition here is that we are essentially simulating the robots walking along the path
-    /**
-     * Point base = baseStation.getLocation();
-     * int range = baseStation.getRange();
-     * int agent = 0;
-     * Point prev;
-     * for(Point p : path.getPoints():
-     *     if(isPositionOkay(indexToAgent(0,p)):
-     *         prev = p;
-     *     else:
-     *         agent.setPath(prev, false);
-     *         agent++;
-     *         base = prev;
-     * After this each agent plans a path to this point
-     * We then need to compare paths iteratively starting from the base of the chain
-     * to make sure that they can be followed without breaking communications
-     * A good start to doing this is to iterate along each path at the same time and check if both points are in range
-     * As soon as one is not, we set all
-     */
 
     /**
      * Given a path from the base station, find the points that each robot will stop on.
@@ -326,37 +383,48 @@ public class LFComms {
 
         List<Point> output = new ArrayList<>(agentToIndex.size());
         Point prev = p.getStartPoint(); // should always be the base station
+        baseStation.announce("\nFinding agent positions");
+        baseStation.announce("Start = ".concat(prev.toString()));
+        baseStation.announce("Goal = ".concat(p.getGoalPoint().toString()));
         int agentI = 0;
         int range = indexToAgent.get(agentI).getCommRange();
-        int index = 0;
-        while(agentToIndex.get(leader) >= agentI){
-            // iterate over all points
-            for(;index < p.getPoints().size(); index++){
-                // if the next point is out of range, this point must be where the agent stops
-                if(!isPositionOkay(range, prev, p.getPoints().get(index+1))){
-                    prev = p.getPoints().get(index);
-                    output.add(prev);
-                    agentI++;
-                    range = indexToAgent.get(agentI).getCommRange();
+
+        for(int index = 0; index < p.getPoints().size()-1; index++) {
+            // if the next point is out of range, this point must be where the agent stops
+            if (!isPositionOkay(range, prev, p.getPoints().get(index + 1))) {
+                prev = p.getPoints().get(index);
+                output.add(prev);
+                agentI++;
+                if (agentToIndex.get(leader) < agentI) {
+                    break;
                 }
+                range = indexToAgent.get(agentI).getCommRange();
             }
         }
+        // fill the unfilled values with the goal point
+        while(output.size() <= agentToIndex.get(leader)){
+            output.add(p.getGoalPoint());
+        }
+
         return output;
     }
-
-    //TODO: For each agent, plan a path to its point on the new path and check that they all work
 
     /**
      * Checks if b can be traversed while maintaining connection to an agent traversing a
      * We assume a can be traversed while maintaining connection to its previous path
      * (Exact order of a and b doesn't actually matter)
     **/
-    private synchronized boolean checkPaths(double range, Path a, Path b){
+    private synchronized boolean checkPaths(int range, Path a, Path b){
+        baseStation.announce("");
+        baseStation.announce("Checking ".concat(a.toString()).concat(" against ").concat(b.toString()));
+        baseStation.announce(a.toString().concat(" has ".concat(String.valueOf(a.getPoints().size()).concat(" points"))));
+        baseStation.announce(b.toString().concat(" has ".concat(String.valueOf(b.getPoints().size()).concat(" points"))));
+
         int aI = 0;
         int bI = 0;
-        while(aI < a.getPoints().size() || bI < b.getPoints().size()){
+        while(aI < a.getPoints().size()-1 || bI < b.getPoints().size()-1){
 
-            if(!PropModel1.isConnected(baseStation.getOccupancyGrid(), range, a.getPoints().get(aI), b.getPoints().get(bI))){
+            if(!isPositionOkay(range, a.getPoints().get(aI), b.getPoints().get(bI))){
                 return false;
             }
 
@@ -368,5 +436,73 @@ public class LFComms {
             }
         }
         return true;
+    }
+
+    /**
+     * Checks if b can be traversed while maintaining connection to point a
+     */
+    private synchronized boolean checkPathAgainstPoint(int range, Point a, Path b){
+        baseStation.announce("checking ".concat(b.toString()).concat(" against ").concat(a.toString()));
+        for(Point p : b.getPoints()){
+            if(!isPositionOkay(range, a, p)){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //                Auxilliary Functions
+    private State getState(RealAgent a){
+        return agentStates.get(agentToIndex.get(a));
+    }
+    private synchronized void setState(RealAgent a, State newState){
+        agentStates.set(agentToIndex.get(a), newState);
+    }
+    private Point getPoint(RealAgent a){
+        return agentPoints.get(agentToIndex.get(a));
+    }
+    private RealAgent getPredecessor(RealAgent a){
+        return indexToAgent.get(agentToIndex.get(a)-1);
+    }
+
+    /**
+     * Check if all agents are in a state
+     */
+    private synchronized boolean allInState(State targetState){
+        for(State state : agentStates){
+            if(state != targetState){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Set all agents above agent a in the chain to a new state (Including agent a)
+     */
+    private synchronized void setSuccessors(RealAgent a, State newState){
+        for(int i = agentToIndex.get(a); i < agentStates.size(); i++){
+            agentStates.set(i, newState);
+        }
+    }
+
+
+    //                Position Checking
+    private synchronized boolean isPositionOkay(RealAgent a, Point p){
+        RealAgent prevChain = indexToAgent.get(agentToIndex.get(a)-1);
+        if(a == leader){
+            // the leader has no successor
+            return PropModel1.isConnected(baseStation.getOccupancyGrid(), prevChain.getCommRange(), p, prevChain.getLocation());
+        } else{
+            // check if the point we can go to is viable for communication from both the predecessor and successor
+            RealAgent nextChain = indexToAgent.get(agentToIndex.get(a) + 1);
+            return PropModel1.isConnected(baseStation.getOccupancyGrid(), prevChain.getCommRange(), p, prevChain.getLocation())
+                    &&
+                    PropModel1.isConnected(baseStation.getOccupancyGrid(), a.getCommRange(), p, nextChain.getLocation());
+        }
+    }
+
+    private synchronized boolean isPositionOkay(int range, Point a, Point b){
+        return PropModel1.isConnected(baseStation.getOccupancyGrid(), range, a, b);
     }
 }

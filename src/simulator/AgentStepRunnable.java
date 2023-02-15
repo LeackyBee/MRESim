@@ -75,7 +75,7 @@ public class AgentStepRunnable implements Runnable {
         Point nextStep;
         double[] sensorData;
         double distance_left = agent.getSpeed();
-
+        agent.flushLog();
         //Continue along the path,
         //until we have exhausted agent 'speed' per cycle or run out of path
         while (distance_left > 0) {
@@ -98,21 +98,14 @@ public class AgentStepRunnable implements Runnable {
                         + "distance_left is " + distance_left);
             }
 
-            /**
-             System.out.println(String.valueOf(timeElapsed).concat(" : Distance left  : ".concat(String.valueOf(distance_left))));
-            System.out.println(String.valueOf(timeElapsed).concat(" : Distance point : ".concat(String.valueOf(nextStep.distance(agent.getLocation())))));
-            System.out.println(String.valueOf(timeElapsed).concat(" : Point          : ").concat(nextStep.getLocation().toString()));
-            System.out.println(String.valueOf(timeElapsed).concat(" : Location       : ").concat(agent.getLocation().toString()));
-            **/
-
             //Check to make sure step is legal
             if (env.legalMove(agent.getLocation(), nextStep, agent.ability)) {
                 //check here we don't 'teleport'
                 double dist = agent.getLocation().distance(nextStep);
-                //If we don't have enough 'speed'
+                // If we don't have enough 'speed'
                 // left to reach nextPoint, go as far as we can and keep nextPoint in the path
                 if (dist > distance_left) {
-                    //Could not do last step, set this back on step
+                    // Could not do last step, set this back on step
                     if (agent.getPath() != null) {
                         agent.getPath().resetStep();
                     }
@@ -134,27 +127,16 @@ public class AgentStepRunnable implements Runnable {
             } else {
                 System.err.println(agent + " at cycle " + timeElapsed + ": setting envError because direct line not possible from ("
                         + (int) agent.getLocation().getX() + "," + (int) agent.getLocation().getY() + ") to (" + nextStep.x + "," + nextStep.y + "), distance: " + nextStep.distance(agent.getLocation()));
-                //Remove safe space status for the points along the line, so that obstacles can be sensed there
-                //if (nextStep.distance(agent.getLocation()) <= 4) {
-                //We are bordering next step, and because we cannot move there it must be an obstacle
+                // Remove safe space status for the points along the line, so that obstacles can be sensed there
+                // if (nextStep.distance(agent.getLocation()) <= 4) {
+                // We are bordering next step, and because we cannot move there it must be an obstacle
                 int deltaX = agent.getLocation().x - nextStep.x;
                 int deltaY = agent.getLocation().y - nextStep.y;
                 if (deltaX <= 2 && deltaX >= -2 && deltaY <= 2 && deltaY >= -2) {
                     agent.getOccupancyGrid().setObstacleAt(agent.getLocation().x + (int) Math.ceil(deltaX / 2.0), agent.getLocation().y + (int) Math.ceil(deltaY / 2.0));
                     agent.getOccupancyGrid().setNoFreeSpaceAt(agent.getLocation().x + (int) Math.ceil(deltaX / 2.0), agent.getLocation().y + (int) Math.ceil(deltaY / 2.0));
                 }
-                //agent.getOccupancyGrid().setObstacleAt(nextStep.x, nextStep.y);
-                //agent.getOccupancyGrid().setNoFreeSpaceAt(nextStep.x, nextStep.y);
-//                    agent.getOccupancyGrid().setSafeSpaceAt(nextStep.x, nextStep.y);
-                //} else {
-                //there are several points between us and nextStep, so we don't know which one exactly has obstacle
-//                    LinkedList<Point> ptsNonSafe
-//                            = agent.getOccupancyGrid().pointsAlongSegment(agent.getLocation().x, agent.getLocation().y,
-//                                    nextStep.x, nextStep.y);
-//                    ptsNonSafe.stream().filter((p) -> (!p.equals(agent.getLocation()))).forEach((p) -> {
-//                        agent.getOccupancyGrid().setNoSafeSpaceAt(p.x, p.y);
-//                    });
-                //}
+
                 if (agent.getPath() != null) {
                     agent.getPath().resetStep();
                 }
@@ -166,20 +148,26 @@ public class AgentStepRunnable implements Runnable {
             boolean canContinueOnPath = (agent.getPath() != null) && !agent.getPath().isFinished() && (agent.getPath().getPoints() != null)
                     && (agent.getPath().getPoints().size() > 0) && (!agent.getEnvError());
             if (!canContinueOnPath) {
+                agent.announce("Cannot continue path");
+                if(agent.getPath() == null){
+                    agent.announce("due to null path");
+                } else if(agent.getPath().isFinished()){
+                    agent.announce("due to path being finished");
+                } else if(agent.getPath().getPoints() == null){
+                    agent.announce("due to null points");
+                } else if(agent.getPath().getPoints().size() <= 0){
+                    agent.announce("due to no points");
+                } else{
+                    agent.announce("due to env error");
+                }
                 break;
             }
 
-            /*if ((agent.getState() != Agent.AgentState.Explore)
-                    && (agent.getState() != Agent.AgentState.GoToChild)
-                    && (agent.getState() != Agent.AgentState.ReturnToBaseStation)
-                    && (agent.getState() != Agent.AgentState.Initial)
-                    && (agent.getState() != Agent.AgentState.AKTIVE)) {
-                break;
-            }*/
             if (simConfig.getExpAlgorithm() == SimulatorConfig.exptype.RunFromLog) {
                 break;
             }
             if (agent.isStepFinished()) {
+                agent.announce("Step Finished");
                 agent.setStepFinished(false);
                 break;
             }

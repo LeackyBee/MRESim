@@ -84,7 +84,7 @@ public class Path {
     }
 
     public Path(OccupancyGrid agentGrid, Point startpoint, Point endpoint, boolean limit, boolean jump, boolean exact) {
-        this.reverse = false;
+        this.alecReverse = false;
         this.startPoint = startpoint;
         this.goalPoint = endpoint;
         this.limit = limit;
@@ -110,7 +110,7 @@ public class Path {
 
     public Path(OccupancyGrid agentGrid, TopologicalMap tMap,
             Point startpoint, Point endpoint, boolean limit, boolean jump, boolean exact) throws IllegalStateException {
-        this.reverse = false;
+        this.alecReverse = false;
         this.startPoint = startpoint;
         this.goalPoint = endpoint;
         this.tMap = tMap;
@@ -132,7 +132,7 @@ public class Path {
     }
 
     public Path(Path p) throws IllegalStateException {
-        this.reverse = p.reverse;
+        this.alecReverse = p.alecReverse;
         this.currentPoint = p.currentPoint;
         this.valid = p.valid;
         this.startPoint = p.startPoint;
@@ -954,15 +954,27 @@ public class Path {
             }
         }
     }
-    boolean reverse;
+    boolean alecReverse;
 
     public void AlecReverse(){
-        reverse = !reverse;
+        alecReverse = !alecReverse;
     }
-    public boolean GetAlecReverse(){ return reverse;}
+    public boolean GetAlecReverse(){ return alecReverse;}
+
+    private Point alecFinish = null;
+    private boolean alecDone = false;
 
     /**
-     * New method to use paths: create path and walk through it by itetator nextPoint.
+     * Set a new end point
+     * @param p
+     */
+    public void setAlecFinish(Point p){
+        alecFinish = p;
+        alecDone = false;
+    }
+
+    /**
+     * New method to use paths: create path and walk through it by iterator nextPoint.
      *
      * @return next Point to go to
      */
@@ -977,7 +989,14 @@ public class Path {
                 }
             }
         }
-        if(reverse){
+
+        if(pathPoints.get(currentPoint).equals(alecFinish)){
+            System.out.println("triggered alecFinish");
+            alecDone = true;
+            return alecFinish;
+        }
+
+        if(alecReverse){
             if (currentPoint <= 0) {
                 //System.out.println("Start Point");
                 return startPoint;
@@ -1005,7 +1024,7 @@ public class Path {
     }
 
     public boolean isFinished() {
-        return reverse ? currentPoint <= 0 : currentPoint >= pathPoints.size() - 1;
+        return alecDone || alecReverse ? currentPoint <= 0 : currentPoint >= pathPoints.size() - 1;
     }
 
     public void resetStep() {

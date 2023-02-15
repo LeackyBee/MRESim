@@ -176,7 +176,13 @@ public class PropModel1 {
     }
 
     public static boolean isConnected(OccupancyGrid grid, double agentRange, Point p1, Point p2) {
-        return (signalStrength(agentRange, grid, p1, p2) >= CUTOFF);
+        if((signalStrength(agentRange, grid, p1, p2) >= CUTOFF)){
+            //System.out.println(p1.toString().concat(" can connect to ".concat(p2.toString().concat(" at range ".concat(String.valueOf(agentRange))))));
+            return true;
+        } else {
+            //System.out.println(p1.toString().concat(" cannot connect to ".concat(p2.toString().concat(" at range ".concat(String.valueOf(agentRange))))));
+            return false;
+        }
     }
 
     //For use by simulation
@@ -191,6 +197,7 @@ public class PropModel1 {
     public static double signalStrength(double agentRange, OccupancyGrid occGrid, Point p1, Point p2) {
         int numWalls = Math.min(MAX_WALLS, occGrid.numPossibleObstaclesOnLine(p1.x, p1.y, p2.x, p2.y));
         double distance = p1.distance(p2);
+
 
         return (REF_SIGNAL - (10 * PATHLOSS_FACTOR * Math.log10(distance / /*REF_DISTANCE*/ (agentRange
                 * (1 / AGENT_ESTIMATION_FACTOR)))) - numWalls * WALL_ATTENUATION_AGENT);

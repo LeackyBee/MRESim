@@ -497,18 +497,7 @@ public class RealAgent extends Agent {
         } else {
             setState(AgentState.AKTIVE);
         }
-        //shall we go out of service?
-        if (Math.random() < SimConstants.PROB_OUT_OF_SERVICE) {
-            if ((timeElapsed > (robotNumber * 150)) && (robotNumber > 0)) {
-                setState(AgentState.OutOfService);
-            }
-        }
 
-        //if we are out of service, don't move, act as relay
-        if (getState() == AgentState.OutOfService) {
-            setSpeed(0);
-            return getLocation();
-        }
 
         if (oldTimeElapsed != timeElapsed) {
             // First call in cycle
@@ -540,7 +529,6 @@ public class RealAgent extends Agent {
                         break;
                 }
             }
-
             nextStep = exploration.takeStep(timeElapsed);
             if (simConfig.getExpAlgorithm() == SimulatorConfig.exptype.RunFromLog) {
                 //Make sure the GUI can display a path estimate
@@ -550,6 +538,10 @@ public class RealAgent extends Agent {
             incrementStateTimer();
         } else if (getEnvError() || path == null || !path.isValid()) {
             //enverror handling, just stay
+            announce("LOOK HERE");
+            announce(String.valueOf(getEnvError()));
+            announce(String.valueOf(path == null));
+            announce(String.valueOf(!path.isValid()));
             nextStep = stay();
         } else {
             // further call in cycle, just give next points of path
@@ -558,7 +550,6 @@ public class RealAgent extends Agent {
                     break;
                 case LeaderFollower:
                     nextStep = this.getNextPathPoint();
-
                     // Edited to make the agent always run my code - Alec
                     //nextStep = exploration.takeStep(timeElapsed);
                     break;

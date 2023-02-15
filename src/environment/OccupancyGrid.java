@@ -769,11 +769,16 @@ public class OccupancyGrid implements IntGrid {
         return counter;
     }
 
+    // Rewritten by Alec
     public int numPossibleObstaclesOnLine(int x1, int y1, int x2, int y2) {
         int counter = 0;
         double angle = Math.atan2(y2 - y1, x2 - x1);
+        int xInc = (int) Math.cos(angle);
+        int yInc = (int) Math.sin(angle);
+
         int distance = (int) (Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2)));
-        int currX, currY;
+        int currX = x1;
+        int currY = y1;
         boolean insideWall = false; //flag to make sure a thick wall counts as one obstacle
 
         //every meter of unknown space we assume there is one wall.
@@ -781,13 +786,35 @@ public class OccupancyGrid implements IntGrid {
         int unknownSpaceWallLimit = 13; //0.078m/px makes it 1 meter
 
         for (int i = 0; i <= distance; i++) {
-            currX = x1 + (int) (Math.cos(angle) * i);
-            currY = y1 + (int) (Math.sin(angle) * i);
+            currX += xInc;
+            currY += yInc;
 
+            if(this.freeSpaceAt(currX, currY)){
+               insideWall = false;
+               unknownSpaceCounter = 0;
+               continue;
+            }
+
+            if(this.obstacleAt(currX, currY) && !insideWall){
+                System.out.println("Found new wall");
+                counter++;
+                insideWall = true;
+                unknownSpaceCounter = 0;
+                continue;
+            }
+
+            unknownSpaceCounter++;
+            if(unknownSpaceCounter >= unknownSpaceWallLimit){
+                System.out.println("added wall due to unknown space");
+                unknownSpaceCounter = 0;
+                counter++;
+            }
+            /* original code
             if (!this.freeSpaceAt(currX, currY)) {
                 if (!this.obstacleAt(currX, currY)) {
                     unknownSpaceCounter++;
                     if (unknownSpaceCounter > unknownSpaceWallLimit) {
+                        System.out.println("added wall due to unknown space");
                         counter++;
                         unknownSpaceCounter = 0;
                     }
@@ -796,11 +823,13 @@ public class OccupancyGrid implements IntGrid {
                 }
                 if (!insideWall) {
                     counter++;
+                    System.out.println("found wall");
                     insideWall = true;
                 }
             } else {
                 insideWall = false;
             }
+             */
         }
 
         return counter;
