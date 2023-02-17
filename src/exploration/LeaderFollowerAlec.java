@@ -2,7 +2,6 @@ package exploration;
 
 import agents.Agent;
 import agents.RealAgent;
-import communication.PropModel1;
 import config.SimulatorConfig;
 
 import java.awt.*;
@@ -31,6 +30,9 @@ public class LeaderFollowerAlec extends BasicExploration implements Exploration{
 
     @Override
     public Point takeStep(int timeElapsed) {
+        if(agent.getEnvError()){
+            agent.getPath().resetStep();
+        }
 
         if(timeElapsed == 0){
             // This exists so that the agents can gather information and transmit to the base station for planning

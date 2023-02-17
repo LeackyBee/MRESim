@@ -243,12 +243,16 @@ public class RealAgent extends Agent {
 
     // Prepends the robots number, so it is easy to tell which robot triggered the statement.
     public void announce(String message){
-        log = log.concat("(".concat(String.valueOf(getName())).concat(") ").concat(message).concat("\n"));
+        if(SimConstants.ALEC_DEBUG){
+            log = log.concat("(".concat(String.valueOf(getName())).concat(") ").concat(message).concat("\n"));
+        }
     }
 
     public void flushLog(){
-        System.out.println(log);
-        log = "";
+        if(SimConstants.ALEC_DEBUG){
+            System.out.println(log);
+            log = "";
+        }
     }
 
     public Frontier getFrontier() {
@@ -647,12 +651,14 @@ public class RealAgent extends Agent {
             }
         }
 
-        Path tpath;
+        Path tpath = new Path(occGrid, startPoint, goalPoint, false, !pureAStar, exact);;
+        /*
         try {
             tpath = new Path(occGrid, topologicalMap, startPoint, goalPoint, false, !pureAStar, exact);
         } catch (IllegalStateException e) {
             tpath = new Path(occGrid, startPoint, goalPoint, false, !pureAStar, exact);
         }
+         */
 
         if (!tpath.found && !(timeTopologicalMapUpdated == timeElapsed)) {
             //Update topological map and retry

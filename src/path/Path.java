@@ -98,11 +98,11 @@ public class Path {
         this.allPathPixels = null;
         this.exact = exact;
         if (!jump) {
-            this.found = calculateAStarPath(exact);
+            this.found = calculateAlecAStarPath(exact);
         } else {
             this.found = calculateJumpPath();
             if (!this.found) {
-                this.found = calculateAStarPath(exact);
+                this.found = calculateAlecAStarPath(exact);
             }
         }
 
@@ -370,6 +370,9 @@ public class Path {
                 if (closedSet.contains(neighbour)) {
                     continue;
                 }
+                if(grid.numPossibleObstaclesOnLine(current.x,current.y,neighbour.x,neighbour.y) > 0){
+                    continue;
+                }
                 tentative_g_score = g_score.get(current) + current.distance(neighbour);
 
                 if (!openSet.contains(neighbour) || !g_score.containsKey(neighbour) || (tentative_g_score < g_score.get(neighbour))) {
@@ -387,6 +390,75 @@ public class Path {
         return !limit_hit && testPath(true);
     }
 
+    public boolean calculateAlecAStarPath(boolean exact){
+        pathPoints = new ArrayList<>();
+        reversePathPoints = new ArrayList<>();
+
+        int stepSize = exact ? 1 : SimConstants.STEP_SIZE;
+
+        Map<Point, Point> backtrace = new HashMap<>();
+        Map<Point, Double> gScores = new HashMap<>();
+        Map<Point, Double> fScores = new HashMap<>();
+
+        gScores.put(startPoint, 0.0);
+        fScores.put(startPoint, heuristicCostEstimate(startPoint, goalPoint));
+
+        List<Point> frontier = new ArrayList<>();
+        frontier.add(startPoint);
+
+        while(!frontier.isEmpty()){
+            Point c = frontier.stream().min(
+                    (a,b) -> (int) (fScores.getOrDefault(a, Double.MAX_VALUE) - fScores.getOrDefault(b, Double.MAX_VALUE))).get();
+
+            if(c.distance(goalPoint) < stepSize && !c.equals(goalPoint)){
+                backtrace.put(goalPoint, c);
+                c = goalPoint;
+            }
+
+            if(c.equals(goalPoint)){
+                reversePathPoints.add(c);
+                while(c != startPoint){
+                    c = backtrace.get(c);
+                    reversePathPoints.add(c);
+                }
+
+                for (int i = reversePathPoints.size() - 1; i >= 0; i--) {
+                    pathPoints.add(reversePathPoints.get(i));
+                }
+                found = true;
+                recalcLength();
+                return testPath(true);
+            }
+
+
+            frontier.remove(c);
+
+            List<Point> neighbours = neighbours(c, stepSize);
+
+
+            for(Point n : neighbours){
+                if(!grid.locationExists(n.x, n.y) || grid.obstacleAt(n) || grid.numObstaclesOnLine(c.x, c.y, n.x,n.y) > 0 || !grid.legalMove(c, n) || !grid.legalMove(n,c)){
+                    gScores.put(n, Double.MAX_VALUE);
+                    continue;
+                }
+
+                double tempGScore = gScores.get(c) + c.distance(n) * (grid.obstacleWithinDistance(n.x, n.y,SimConstants.WALL_DISTANCE) ? 2 : 1);
+
+                if(tempGScore < gScores.getOrDefault(n, Double.MAX_VALUE)){
+                    backtrace.put(n, c);
+                    gScores.put(n, tempGScore);
+                    fScores.put(n, tempGScore + heuristicCostEstimate(n, goalPoint));
+                    if(!frontier.contains(n)){
+                        frontier.add(n);
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // Add all points to pathPoints, reverse this into the reversePathPoints list, then swap them
+    // ???
     private void reconstructPath(HashMap<Point, Point> came_from, Point current_node) {
         while (came_from.containsKey(current_node) && (came_from.get(current_node) != current_node)) {
             pathPoints.add(current_node);
@@ -827,7 +899,6 @@ public class Path {
     private LinkedList<Point> neighbours(Point pt, int stepSize) {
         LinkedList<Point> validNeighbours = new LinkedList<Point>();
         int neighbourX, neighbourY;
-
         for (neighbourX = pt.x - stepSize; neighbourX <= pt.x + stepSize; neighbourX += stepSize) {
             for (neighbourY = pt.y - stepSize; neighbourY <= pt.y + stepSize; neighbourY += stepSize) {
 
@@ -862,25 +933,14 @@ public class Path {
                         continue;
                     }
                 }
-
+                /*
                 // Check 4: is it not too close to wall (unless it's a goalPoint)
-                if (exact && grid.obstacleWithinDistance(neighbourX, neighbourY, 2)
+                if (exact && grid.obstacleWithinDistance(neighbourX, neighbourY, 4)
                         && !(goalPoint.distance(neighbourX, neighbourY) <= 2)
                         && !(startPoint.distance(neighbourX, neighbourY) <= 2)) {
                     continue;
                 }
-                // Check 5: avoid running into teammates
-                /*teammateCollision = false;
-                for(TeammateAgent t: agent.getAllTeammates().values())
-                    if(t.isInDirectRange() &&
-                       t.distanceTo(new Point(neighbourX, neighbourY)) < 2*SimConstants.WALL_DISTANCE &&
-                       !(goalPoint.distance(neighbourX, neighbourY) <= SimConstants.WALL_DISTANCE )) {
-                        teammateCollision = true;
-                        break;
-                    }
-                if(teammateCollision)
-                    continue;*/
-                // If we get here, all checks passed, add neighbour
+                 */
                 validNeighbours.add(new Point(neighbourX, neighbourY));
             }
         }
@@ -994,15 +1054,14 @@ public class Path {
             }
         }
 
-        if(pathPoints.get(currentPoint).equals(alecFinish)){
-            System.out.println("triggered alecFinish");
+        if(alecFinish != null && pathPoints.get(currentPoint).distance(alecFinish) < 2){
             alecDone = true;
             return alecFinish;
         }
 
         if(alecReverse){
             if (currentPoint <= 0) {
-                //System.out.println("Start Point");
+                currentPoint = 0;
                 return startPoint;
             } else {
                 currentPoint--;
@@ -1069,11 +1128,22 @@ public class Path {
     public boolean testPath(boolean complete) {
         if (complete && (pathPoints == null || pathPoints.isEmpty() || !pathPoints.get(0).equals(this.startPoint) || !pathPoints.get(pathPoints.size() - 1).equals(this.goalPoint))) {
             this.found = false;
+            System.out.println("failed here");
+            if(pathPoints == null){
+                System.out.println("null path points");
+            } else if(pathPoints.isEmpty()){
+                System.out.println("empty path points");
+            } else if(!pathPoints.get(0).equals(this.startPoint)){
+                System.out.println("start point not in pathpoints");
+            } else if(!pathPoints.get(pathPoints.size() - 1).equals(this.goalPoint)){
+                System.out.println("end point not in pathpoints");
+            }
             this.setInvalid();
             return false;
         }
         for (int i = 1; i < pathPoints.size(); i++) {
             if (pathPoints.get(i).distance(pathPoints.get(i - 1)) > 30) {
+                System.out.println("too far");
                 return false;
             }
         }
@@ -1104,5 +1174,14 @@ public class Path {
             return startPoint;
         }
         return pathPoints.get(pathPoints.size()/2);
+    }
+
+    public void fullPrint(){
+        for(int i = 0; i < pathPoints.size()-1; i++){
+            System.out.println(pathPoints.get(i).toString()
+                    .concat(" leads to ".concat(pathPoints.get(i+1).toString()
+                            .concat(" at distance "
+                                    .concat(String.valueOf(pathPoints.get(i).distance(pathPoints.get(i+1))))))));
+        }
     }
 }

@@ -55,6 +55,8 @@ import java.nio.file.Paths;
  */
 public class SimConstants {
 
+    public static final boolean ALEC_DEBUG = false;
+
     /**
      * Show messages on stdout. Remember to clean build if changed!
      */
@@ -142,7 +144,7 @@ public class SimConstants {
      * Maximum proximity an relay may have to a wall, in pixels, when planning paths. (May cause
      * bugs if less than step size) Default 3
      */
-    public static final int WALL_DISTANCE = 7;
+    public static final int WALL_DISTANCE = 3;
 
     /**
      * How many neighbours are added to the queue for AStar search when planning paths.

@@ -19,6 +19,7 @@ import java.util.List;
 public class LFComms {
 
     private static final State START_STATE = State.Initial;
+    private static final boolean EXACT_PATH = true;
 
     private enum State {
         Initial, // first state to make them stay
@@ -49,10 +50,12 @@ public class LFComms {
     private Point predPoint;
     private int predId;
 
-    private final List<Path> agentBSPaths;
+    private List<Path> agentBSPaths;
 
 
     private final PriorityQueue<Frontier> frontiers;
+
+    private final List<Frontier> failPlanFrontiers;
     private Frontier f;
 
     private LFComms(){
@@ -62,6 +65,7 @@ public class LFComms {
         agentStates = new ArrayList<>();
         agentPoints = new ArrayList<>();
         agentBSPaths = new ArrayList<>();
+        failPlanFrontiers = new ArrayList<>();
     }
 
     //                            Initialisation Methods
@@ -122,6 +126,7 @@ public class LFComms {
             assignIndices();
             begun = true;
         }
+        a.announce("Current location ".concat(a.getLocation().toString()));
 
         switch (getState(a)){
             case Initial:
@@ -147,7 +152,7 @@ public class LFComms {
 
     //   Waiting methods
     private synchronized Point initial(RealAgent a){
-        setState(a, State.GoingHome);
+        setState(a, State.GoingHome); // Exists to allow sensor data to come in before we plan
         return a.stay();
     }
 
@@ -156,10 +161,8 @@ public class LFComms {
 
         if(allInState(State.WaitAtBS)){
             a.announce("Moving");
-            Collections.fill(agentStates, State.MovingToPoint);
-            leader.addBadFrontier(f); // add this to avoid replanning to out-of-reach frontiers
             newPaths();
-            return movingToPoint(a);
+            return getNextPosition(a);
         } else{
             return a.stay();
         }
@@ -167,6 +170,7 @@ public class LFComms {
     private synchronized Point waitingInChain(RealAgent a){
         a.announce("Waiting in Chain");
         if(allInState(State.WaitInChain)){
+            leader.addBadFrontier(f);
             newPaths();
             return getNextPosition(a);
         } else{
@@ -175,6 +179,7 @@ public class LFComms {
     }
     private synchronized Point waitingForSuccessors(RealAgent a){
         a.announce("Waiting for Successors");
+        a.setEnvError(false);
         if(allInState(State.WaitForSuccessors)){
             Collections.fill(agentStates, State.MovingToPoint);
             return movingToPoint(a);
@@ -195,14 +200,18 @@ public class LFComms {
             return a.stay();
         }
 
+        if(a.getLocation().distance(getPredecessor(a).getLocation()) < 10){
+            setState(getPredecessor(a), State.GoingHome);
+        }
+
         // Should only be called in the first timestep
-        if(a.getPath() == null || !a.getPath().isValid() || a.getPath().isFinished()){
+        if(a.getPath() == null || !a.getPath().isValid() || a.getPath().isFinished() || a.getEnvError()){
             a.announce("Path null");
-            a.setPath(a.calculateAStarPath(getPredecessor(a).getLocation(), true));
+            a.setEnvError(false);
+            a.setPath(a.calculateAStarPath(getPredecessor(a).getLocation(), false));
         }
 
         Point next = a.getNextPathPoint();
-
         if(isPositionOkay(a, next)){
             a.announce("Position Okay");
             return next;
@@ -232,12 +241,20 @@ public class LFComms {
     private synchronized Point movingToPredecessor(RealAgent a){
         a.announce("Moving to Predecessors");
 
+        if(a.getEnvError()){
+            a.setEnvError(false);
+            a.setPathInvalid();
+            a.setPath(a.calculateAStarPath(predPoint, true));
+        }
+
         if(a.getLocation().equals(predPoint)){
             setState(a, State.WaitForSuccessors);
             a.setPath(a.calculateAStarPath(agentPoints.get(predId), true)); // we can assume this will be the same as the path the original agent planned
             return waitingForSuccessors(a);
         } else{
-            return a.getNextPathPoint();
+            Point next = a.getNextPathPoint();
+            a.announce("Target = ".concat(predPoint.toString()).concat(", Next Point = ".concat(next.toString())));
+            return next;
         }
     }
 
@@ -249,9 +266,15 @@ public class LFComms {
             setState(a, State.WaitInChain);
             return waitingInChain(a);
         } else{
+            if(a.getEnvError()){
+                a.announce("Env Error, oops!");
+                leader.addBadFrontier(f);
+                clearEnvErrors();
+                goHome();
+            }
             while(!a.getPath().isValid()){
                 a.announce("Path invalid");
-                a.setPath(a.calculatePath(getPoint(a),true));
+                a.setPath(a.calculateAStarPath(getPoint(a),EXACT_PATH));
             }
 
             if(a.getPath().isFinished()){
@@ -283,7 +306,7 @@ public class LFComms {
         // convert the contours to frontiers, and filter out all those that are invalid
         for (LinkedList<Point> contour : contours) {
             Frontier frontier = new Frontier(leader.getX(), leader.getY(), contour);
-            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !leader.isBadFrontier(frontier)){
+            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !leader.isBadFrontier(frontier) && !failPlanFrontiers.contains(frontier)){
                 frontiers.add(frontier);
             }
         }
@@ -300,24 +323,33 @@ public class LFComms {
 
     private synchronized void newPaths(){
         baseStation.announce("Triggered newPaths()");
-        // Step 1)
-        calculateFrontiers();
+        Path p;
+        do {
+            // Step 1)
+            calculateFrontiers();
 
+            if(frontiers.isEmpty()){ // exploration is over
+                baseStation.announce("Empty Frontiers List");
+                baseStation.setMissionComplete(true);
+                goHome();
+                return;
+            }
 
-        if(frontiers.isEmpty()){ // exploration is over
-            baseStation.announce("Empty Frontiers List");
-            goHome();
-            return;
+            // In this algorithm we actually want to poll the frontier closest to the leader, since each exploration requires
+            // a lot of coordination. By choosing the frontier closest to the leader we will generally not need to move the chain as much
+            f = frontiers.stream().min((f1, f2) -> (int) (f1.getCentre().distance(leader.getLocation()) - f2.getCentre().distance(leader.getLocation()))).get();
+            baseStation.announce(f.toString());
+            failPlanFrontiers.add(f);
+            // Step 2)
+            p = baseStation.calculateAStarPath(f.getCentre(), EXACT_PATH);
+        } while(!p.isValid());
+        failPlanFrontiers.clear();
+
+        baseStation.setPath(p);
+        List<Path> newBSPaths = new ArrayList<>();
+        for(int i = 0; i < agentToIndex.size(); i++){
+            newBSPaths.add(baseStation.calculateAStarPath(f.getCentre(),EXACT_PATH));
         }
-
-        // In this algorithm we actually want to poll the frontier closest to the leader, since each exploration requires
-        // a lot of coordination. By choosing the frontier closest to the leader we will generally not need to move the chain as much
-        f = frontiers.stream().min((f1, f2) -> (int) (f1.getCentre().distance(leader.getLocation()) - f2.getCentre().distance(leader.getLocation()))).get();
-
-        baseStation.announce(f.toString());
-        // Step 2)
-        Path p = baseStation.calculateAStarPath(f.getCentre(),false);
-        agentBSPaths.replaceAll(ignore -> baseStation.calculateAStarPath(f.getCentre(),false));
 
         // Step 3)
         agentPoints = findAgentPositions(p);
@@ -326,7 +358,7 @@ public class LFComms {
 
         // Step 4)
         for(int i = 0; i < agentToIndex.keySet().size(); i++){
-            paths.add(indexToAgent.get(i).calculateAStarPath(agentPoints.get(i), false));
+            paths.add(baseStation.calculatePath(indexToAgent.get(i).getLocation(), agentPoints.get(i), true,  EXACT_PATH));
         }
         baseStation.announce(paths.toString());
 
@@ -346,7 +378,7 @@ public class LFComms {
          // Recursive case: Each path against the last one
         for(int i = 1; i < paths.size(); i++){
             if(checkPaths(baseStation.getCommRange(), paths.get(i-1), paths.get(i))){
-                System.out.println("Agent ".concat(String.valueOf(i).concat( ") Path is okay")));
+                baseStation.announce("Agent ".concat(String.valueOf(i).concat( ") Path is okay")));
                 indexToAgent.get(i).setPathInvalid();
                 indexToAgent.get(i).setPath(paths.get(i));
                 setState(indexToAgent.get(i), State.WaitForSuccessors);
@@ -357,24 +389,29 @@ public class LFComms {
                 setSuccessors(indexToAgent.get(i), State.MovingToPredecessor);
                 for(int j = i; j < agentToIndex.size(); j++){
                     baseStation.announce("Agent ".concat(String.valueOf(j).concat( ") Path is not okay")));
-                    indexToAgent.get(j).getPath().AlecReverse();
-                    indexToAgent.get(j).getPath().setAlecFinish(predPoint);
+                    RealAgent agent = indexToAgent.get(j);
+                    setAgentBSPath(agent);
                 }
                 break;
             }
         }
+
+        agentBSPaths = newBSPaths;
     }
 
     private void goHome(){
-        baseStation.announce("Triggered goHome()");
+        failPlanFrontiers.clear();
+        predPoint = baseStation.getLocation();
+        baseStation.announce("Triggered Full Recall");
         agentToIndex.keySet().forEach(a -> {
-            setState(a, State.GoingHome);
-            if(a.getPath() != null){
-                a.getPath().AlecReverse();
-            } else {
-                a.setPath(a.calculateAStarPath(baseStation.getLocation(), true));
+            if(a.getLocation().equals(baseStation.getLocation())){
+                setState(a, State.WaitAtBS);
+            } else{
+                setState(a, State.WaitForSuccessors);
+                setAgentBSPath(a);
             }
         });
+        setState(leader, State.GoingHome);
     }
 
 
@@ -388,7 +425,7 @@ public class LFComms {
 
         List<Point> output = new ArrayList<>(agentToIndex.size());
         Point prev = p.getStartPoint(); // should always be the base station
-        baseStation.announce("\nFinding agent positions");
+        baseStation.announce("Finding agent positions");
         baseStation.announce("Start = ".concat(prev.toString()));
         baseStation.announce("Goal = ".concat(p.getGoalPoint().toString()));
         int agentI = 0;
@@ -461,10 +498,20 @@ public class LFComms {
         return agentStates.get(agentToIndex.get(a));
     }
     private synchronized void setState(RealAgent a, State newState){
-        agentStates.set(agentToIndex.get(a), newState);
+        if (!a.equals(baseStation)) {
+            agentStates.set(agentToIndex.get(a), newState);
+        }
     }
     private Point getPoint(RealAgent a){
         return agentPoints.get(agentToIndex.get(a));
+    }
+
+    private void setAgentBSPath(RealAgent a){
+        Path p = agentBSPaths.get(agentToIndex.get(a));
+        a.setPath(p);
+        p.budge(a.getLocation());
+        p.AlecReverse();
+        p.setAlecFinish(predPoint);
     }
     private RealAgent getPredecessor(RealAgent a){
         return indexToAgent.get(agentToIndex.get(a)-1);
@@ -480,6 +527,12 @@ public class LFComms {
             }
         }
         return true;
+    }
+
+    private void clearEnvErrors(){
+        for(RealAgent a : agentToIndex.keySet()){
+            a.setEnvError(false);
+        }
     }
 
     /**

@@ -286,6 +286,26 @@ public class OccupancyGrid implements IntGrid {
         return cellsUpdated;
     }
 
+
+    public boolean legalMove(Point source, Point dest) {
+        int dx = dest.x - source.x;
+        int dy = dest.y - source.y;
+
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            return directLinePossible(source, dest, true, false);
+        }
+
+        if (dx != 0 && dy != 0) {
+            //diagonal move (one diagonal pixel must be free)
+            return ((locationExists(source.x + dx, source.y) && !obstacleAt(new Point(source.x + dx, source.y)))
+                    || (locationExists(source.x, source.y + dy) && !obstacleAt(new Point(source.x, source.y + dy))))
+                    && locationExists(dest.x, dest.y) && !obstacleAt(new Point(dest.x, dest.y));
+        } else {
+            //horizontal or vertical move
+            return locationExists(dest.x, dest.y) && !obstacleAt(new Point(dest.x, dest.y));
+        }
+    }
+
     /**
      * Is freeSpace/not obstacle and has unknown cell around (frontier-cell)
      *
@@ -748,22 +768,14 @@ public class OccupancyGrid implements IntGrid {
         double angle = Math.atan2(y2 - y1, x2 - x1);
         int distance = (int) (Math.sqrt(Math.pow(y2 - y1, 2) + Math.pow(x2 - x1, 2)));
         int currX, currY;
-        //boolean insideWall = false; //flag to make sure a thick wall counts as one obstacle
 
         for (int i = 0; i <= distance; i++) {
             currX = x1 + (int) (Math.cos(angle) * i);
             currY = y1 + (int) (Math.sin(angle) * i);
 
-            if (this.obstacleAt(currX, currY)) //if (!insideWall) {
-            {
+            if (this.obstacleAt(currX, currY)) {
                 counter++;
             }
-            //    insideWall = true;
-            //}
-            //} else
-            //{
-            //    insideWall = false;
-            //}
         }
 
         return counter;
@@ -796,7 +808,6 @@ public class OccupancyGrid implements IntGrid {
             }
 
             if(this.obstacleAt(currX, currY) && !insideWall){
-                System.out.println("Found new wall");
                 counter++;
                 insideWall = true;
                 unknownSpaceCounter = 0;
@@ -805,7 +816,6 @@ public class OccupancyGrid implements IntGrid {
 
             unknownSpaceCounter++;
             if(unknownSpaceCounter >= unknownSpaceWallLimit){
-                System.out.println("added wall due to unknown space");
                 unknownSpaceCounter = 0;
                 counter++;
             }

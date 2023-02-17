@@ -233,13 +233,12 @@ public class SimulationFramework implements ActionListener {
     }
 
     public boolean simulationCycle() {
-        System.out.println();
         // only run at start
         if (timeElapsed == 0) {
             try {
+                experiment = 1;
                 outputFile = new FileOutputStream("/home/alec/Documents/Cambridge/Work/dissertation/Test Data/experiment".concat(String.valueOf(experiment)).concat(".txt"), true);
 
-                experiment += 1;
 
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -275,8 +274,11 @@ public class SimulationFramework implements ActionListener {
 
         // Move agents
         agentSteps();
-
-        System.out.println("Timestep: ".concat(String.valueOf(timeElapsed)));
+        if(SimConstants.ALEC_DEBUG){
+            System.out.println();
+            System.out.println("Timestep: ".concat(String.valueOf(timeElapsed)));
+        }
+        agent[0].flushLog();
 
         // Update data
         if (timeElapsed % SimConstants.UPDATE_AGENT_KNOWLEDGE_INTERVAL == 0) {
@@ -512,7 +514,7 @@ public class SimulationFramework implements ActionListener {
 
     private boolean baseStationDone() {
         // If the base station knows enough of the map
-        return (((double) agent[0].getStats().getAreaKnown() / (double) totalArea) >= SimConstants.TERRITORY_PERCENT_EXPLORED_GOAL);
+        return agent[0].isMissionComplete() || (((double) agent[0].getStats().getAreaKnown() / (double) totalArea) >= SimConstants.TERRITORY_PERCENT_EXPLORED_GOAL);
     }
 
     private boolean checkRunFinish(RealAgent[] agent, int timeElapsed, double pctAreaKnownTeam, int avgCycleTime) {
