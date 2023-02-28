@@ -439,10 +439,23 @@ public class Path {
             for(Point n : neighbours){
                 if(!grid.locationExists(n.x, n.y) || grid.obstacleAt(n) || grid.numObstaclesOnLine(c.x, c.y, n.x,n.y) > 0 || !grid.legalMove(c, n) || !grid.legalMove(n,c)){
                     gScores.put(n, Double.MAX_VALUE);
+                    fScores.put(n, Double.MAX_VALUE);
                     continue;
                 }
 
-                double tempGScore = gScores.get(c) + c.distance(n) * (grid.obstacleWithinDistance(n.x, n.y,SimConstants.WALL_DISTANCE) ? 2 : 1);
+                int wallDist = 50;
+
+                // Only care about avoiding walls if the avoidance wouldn't exclude the goal
+
+                double tempGScore;
+
+                if(n.distance(goalPoint) < wallDist){
+                    tempGScore = gScores.get(c) + c.distance(n);
+                } else{
+                    tempGScore = gScores.get(c) + c.distance(n) * (grid.obstacleWithinDistance(n.x, n.y, wallDist) ? 10 : 1);
+                }
+
+
 
                 if(tempGScore < gScores.getOrDefault(n, Double.MAX_VALUE)){
                     backtrace.put(n, c);

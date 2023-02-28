@@ -323,7 +323,7 @@ public class RealAgent extends Agent {
     }
 
     public void setPathToBaseStation(boolean exact) {
-        setPath(calculatePath(baseStation.getLocation(), exact));
+        setPath(calculateAStarPath(baseStation.getLocation(), exact));
     }
 
     public boolean isMissionComplete() {

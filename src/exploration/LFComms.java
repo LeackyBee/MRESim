@@ -161,6 +161,7 @@ public class LFComms {
 
         if(allInState(State.WaitAtBS)){
             a.announce("Moving");
+            clearEnvErrors();
             newPaths();
             return getNextPosition(a);
         } else{
@@ -205,10 +206,10 @@ public class LFComms {
         }
 
         // Should only be called in the first timestep
-        if(a.getPath() == null || !a.getPath().isValid() || a.getPath().isFinished() || a.getEnvError()){
+        if(a.getPath() == null || !a.getPath().isValid() || a.getPath().isFinished() || a.getEnvError() || a.getPath().isAlecDone()){
             a.announce("Path null");
             a.setEnvError(false);
-            a.setPath(a.calculateAStarPath(getPredecessor(a).getLocation(), false));
+            a.setPath(a.calculateAStarPath(getPredecessor(a).getLocation(), EXACT_PATH));
         }
 
         Point next = a.getNextPathPoint();
@@ -244,12 +245,12 @@ public class LFComms {
         if(a.getEnvError()){
             a.setEnvError(false);
             a.setPathInvalid();
-            a.setPath(a.calculateAStarPath(predPoint, true));
+            a.setPath(a.calculateAStarPath(predPoint, EXACT_PATH));
         }
 
         if(a.getLocation().equals(predPoint)){
             setState(a, State.WaitForSuccessors);
-            a.setPath(a.calculateAStarPath(agentPoints.get(predId), true)); // we can assume this will be the same as the path the original agent planned
+            a.setPath(a.calculateAStarPath(agentPoints.get(predId), EXACT_PATH)); // we can assume this will be the same as the path the original agent planned
             return waitingForSuccessors(a);
         } else{
             Point next = a.getNextPathPoint();
@@ -281,7 +282,7 @@ public class LFComms {
                 // transition from moving between chains to moving up the chain
                 a.announce("Switching to new path");
                 a.setPathInvalid();
-                a.setPath(a.calculateAStarPath(getPoint(a), true));
+                a.setPath(a.calculateAStarPath(getPoint(a), EXACT_PATH));
             }
 
             return a.getNextPathPoint();

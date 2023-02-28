@@ -236,8 +236,7 @@ public class SimulationFramework implements ActionListener {
         // only run at start
         if (timeElapsed == 0) {
             try {
-                experiment = 1;
-                outputFile = new FileOutputStream("/home/alec/Documents/Cambridge/Work/dissertation/Test Data/experiment".concat(String.valueOf(experiment)).concat(".txt"), true);
+                outputFile = new FileOutputStream("/home/alec/Documents/Cambridge/Work/dissertation/Test Data/experiment.txt", false);
 
 
             } catch (IOException e) {
@@ -310,10 +309,8 @@ public class SimulationFramework implements ActionListener {
             OccupancyGrid total = new OccupancyGrid(env.getColumns(), env.getRows());
             Arrays.stream(agent).forEach(a -> total.mergeGrid(a.getOccupancyGrid(),false));
             double totalKnown = 100*total.getNumFreeCells() / (double) totalArea;
-            outputFile.write(String.valueOf(timeElapsed)
-                            .concat(" : ")
-                            .concat(String.valueOf(pctAreaKnownTeam))
-                            .concat(" : ")
+            outputFile.write(String.valueOf(pctAreaKnownTeam)
+                            .concat(" , ")
                             .concat(String.valueOf(totalKnown))
                             .concat("\n")
                             .getBytes());
