@@ -117,6 +117,10 @@ public class TopologicalNode {
         cells.add(p);
     }
 
+    public int getDegree(){
+        return neighbours.size();
+    }
+
     public LinkedList<Point> getCellList() {
         return cells;
     }

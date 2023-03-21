@@ -1,8 +1,8 @@
-LeaderFollower
+FrontierExploration
 PeriodicReturn
 RangeBorder
 null
-StaticCircle
+DirectLine
 false
 /home/alec/Documents/MRESim Logs/AgentLocations.txt
 false
