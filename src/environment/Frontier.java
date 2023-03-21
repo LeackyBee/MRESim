@@ -93,6 +93,10 @@ public class Frontier implements Comparable<Frontier> {
         }
     }
 
+    public int evaluateFrom(int x, int y){
+        return (int) (this.area/this.centre.distance(x, y));
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj == null) {

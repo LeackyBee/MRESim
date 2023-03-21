@@ -126,9 +126,12 @@ public class RealAgent extends Agent {
 
     private boolean hasDualComLink = false;
 
+    private RobotConfig savedForDummy;
+
     public RealAgent(int envWidth, int envHeight, RobotConfig robot, SimulatorConfig simConfig, RealAgent baseStation) {
         super(robot);
 
+        savedForDummy = robot;
         stats = new AgentStats();
 
         prevX = x;
@@ -165,6 +168,13 @@ public class RealAgent extends Agent {
         this.timeElapsed = -1;
         this.originalChild = this.child;
         this.originalParent = this.parent;
+    }
+
+    public RealAgent dummyAgent(int x, int y, RealAgent baseStation){
+        RealAgent output = new RealAgent(0,0, this.savedForDummy, this.simConfig, baseStation);
+        output.setX(x);
+        output.setY(y);
+        return output;
     }
 
 // <editor-fold defaultstate="collapsed" desc="Get and Set">
@@ -327,6 +337,7 @@ public class RealAgent extends Agent {
     }
 
     public boolean isMissionComplete() {
+        // getStats().getPercentageKnown() > SimConstants.TERRITORY_PERCENT_EXPLORED_GOAL
         return missionComplete;
     }
 
@@ -516,7 +527,7 @@ public class RealAgent extends Agent {
                         exploration = new LeaderFollowerAlec(this, simConfig, ExplorationState.Initial);
                         break;
                     case FrontierExploration:
-                        exploration = new FrontierAlec(this, simConfig, ExplorationState.Initial);
+                        exploration = new HungarianAlec(this, simConfig, ExplorationState.Initial);
                         break;
                     case RoleBasedExploration:
                         exploration = new RoleAlec(this, simConfig, ExplorationState.Initial);

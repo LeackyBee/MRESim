@@ -273,8 +273,9 @@ public class LFComms {
                 clearEnvErrors();
                 goHome();
             }
-            while(!a.getPath().isValid()){
+            if(!a.getPath().isValid()){
                 a.announce("Path invalid");
+                System.out.println("here");
                 a.setPath(a.calculateAStarPath(getPoint(a),EXACT_PATH));
             }
 
@@ -307,7 +308,7 @@ public class LFComms {
         // convert the contours to frontiers, and filter out all those that are invalid
         for (LinkedList<Point> contour : contours) {
             Frontier frontier = new Frontier(leader.getX(), leader.getY(), contour);
-            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !leader.isBadFrontier(frontier) && !failPlanFrontiers.contains(frontier)){
+            if(frontier.getArea() >= SimConstants.MIN_FRONTIER_SIZE && !leader.isBadFrontier(frontier) && !failPlanFrontiers.contains(frontier) && !explored.contains(frontier)){
                 frontiers.add(frontier);
             }
         }
@@ -322,82 +323,116 @@ public class LFComms {
     // Step 5) Check each path can be followed while maintaining connection to previous agent
     // Step 6) If a path is not, the agent and all agents past it must return to the previous one
 
+    List<Frontier> explored = new ArrayList<>();
     private synchronized void newPaths(){
         baseStation.announce("Triggered newPaths()");
         Path p;
-        do {
-            // Step 1)
-            calculateFrontiers();
+        while(true) {
+            do {
+                // Step 1)
+                calculateFrontiers();
 
-            if(frontiers.isEmpty()){ // exploration is over
-                baseStation.announce("Empty Frontiers List");
-                baseStation.setMissionComplete(true);
+                // In this algorithm we actually want to poll the frontier closest to the leader, since each exploration requires
+                // a lot of coordination. By choosing the frontier closest to the leader we will generally not need to move the chain as much
+
+                Optional<Frontier> ft = frontiers.stream()
+                        .filter(f -> !leader.getOccupancyGrid().obstacleWithinDistance(f.getCentre().x, f.getCentre().y, 10))
+                        .min((f1, f2) -> (int) (f1.getCentre().distance(leader.getLocation()) - f2.getCentre().distance(leader.getLocation())));
+
+                //
+                if(ft.isEmpty()){
+                    baseStation.announce("Empty Frontiers List");
+                    baseStation.setMissionComplete(true);
+                    goHome();
+                    return;
+                } else{
+                    f = ft.get();
+                }
+                System.out.println(f);
+                System.out.println(f.getSize());
+                baseStation.announce(f.toString());
+                failPlanFrontiers.add(f);
+                // Step 2)
+                p = baseStation.calculateAStarPath(f.getCentre(), EXACT_PATH);
+            } while (!p.isValid());
+            failPlanFrontiers.clear();
+
+            baseStation.setPath(p);
+            List<Path> newBSPaths = new ArrayList<>();
+            for (int i = 0; i < agentToIndex.size(); i++) {
+                newBSPaths.add(baseStation.calculateAStarPath(f.getCentre(), EXACT_PATH));
+            }
+
+            explored.add(f);
+
+            // Step 3)
+            agentPoints = findAgentPositions(p);
+
+            Point lP = agentPoints.get(agentToIndex.get(leader));
+
+            if (lP.distance(f.getCentre()) > leader.getSenseRange() ||
+                    leader.getOccupancyGrid().numObstaclesOnLine(lP.x, lP.y, f.getCentre().x, f.getCentre().y) > 0) {
+                System.out.println("trigger");
+                leader.addBadFrontier(f);
+                p = null;
+                f = null;
+                continue;
+            }
+            baseStation.announce(agentPoints.toString());
+            List<Path> paths = new ArrayList<>();
+
+            // Step 4)
+            for (int i = 0; i < agentToIndex.keySet().size(); i++) {
+                Path pt = baseStation.calculatePath(indexToAgent.get(i).getLocation(), agentPoints.get(i), true, EXACT_PATH);
+                if(pt.isValid()){
+                    paths.add(pt);
+                } else{
+                    System.out.println("failed");
+                    goHome();
+                    explored.remove(f);
+                    return;
+                }
+
+            }
+            baseStation.announce(paths.toString());
+
+            // Step 5)
+            // Base case: First path against base station
+            if (!checkPathAgainstPoint(indexToAgent.get(0).getCommRange(), baseStation.getLocation(), paths.get(0))) {
+                baseStation.announce("Agent ".concat(String.valueOf(0).concat(") Path is not okay")));
                 goHome();
                 return;
+            } else {
+                baseStation.announce("Agent ".concat(String.valueOf(0).concat(") Path is okay")));
+                indexToAgent.get(0).setPathInvalid();
+                indexToAgent.get(0).setPath(paths.get(0));
+                setState(indexToAgent.get(0), State.WaitForSuccessors);
             }
 
-            // In this algorithm we actually want to poll the frontier closest to the leader, since each exploration requires
-            // a lot of coordination. By choosing the frontier closest to the leader we will generally not need to move the chain as much
-            f = frontiers.stream().min((f1, f2) -> (int) (f1.getCentre().distance(leader.getLocation()) - f2.getCentre().distance(leader.getLocation()))).get();
-            baseStation.announce(f.toString());
-            failPlanFrontiers.add(f);
-            // Step 2)
-            p = baseStation.calculateAStarPath(f.getCentre(), EXACT_PATH);
-        } while(!p.isValid());
-        failPlanFrontiers.clear();
-
-        baseStation.setPath(p);
-        List<Path> newBSPaths = new ArrayList<>();
-        for(int i = 0; i < agentToIndex.size(); i++){
-            newBSPaths.add(baseStation.calculateAStarPath(f.getCentre(),EXACT_PATH));
-        }
-
-        // Step 3)
-        agentPoints = findAgentPositions(p);
-        baseStation.announce(agentPoints.toString());
-        List<Path> paths = new ArrayList<>();
-
-        // Step 4)
-        for(int i = 0; i < agentToIndex.keySet().size(); i++){
-            paths.add(baseStation.calculatePath(indexToAgent.get(i).getLocation(), agentPoints.get(i), true,  EXACT_PATH));
-        }
-        baseStation.announce(paths.toString());
-
-        // Step 5)
-         // Base case: First path against base station
-        if(!checkPathAgainstPoint(indexToAgent.get(0).getCommRange(), baseStation.getLocation(), paths.get(0))){
-            baseStation.announce("Agent ".concat(String.valueOf(0).concat( ") Path is not okay")));
-            goHome();
-            return;
-        } else {
-            baseStation.announce("Agent ".concat(String.valueOf(0).concat( ") Path is okay")));
-            indexToAgent.get(0).setPathInvalid();
-            indexToAgent.get(0).setPath(paths.get(0));
-            setState(indexToAgent.get(0), State.WaitForSuccessors);
-        }
-
-         // Recursive case: Each path against the last one
-        for(int i = 1; i < paths.size(); i++){
-            if(checkPaths(baseStation.getCommRange(), paths.get(i-1), paths.get(i))){
-                baseStation.announce("Agent ".concat(String.valueOf(i).concat( ") Path is okay")));
-                indexToAgent.get(i).setPathInvalid();
-                indexToAgent.get(i).setPath(paths.get(i));
-                setState(indexToAgent.get(i), State.WaitForSuccessors);
-            } else{
-                // Step 6
-                predPoint = indexToAgent.get(i-1).getLocation();
-                predId = i-1;
-                setSuccessors(indexToAgent.get(i), State.MovingToPredecessor);
-                for(int j = i; j < agentToIndex.size(); j++){
-                    baseStation.announce("Agent ".concat(String.valueOf(j).concat( ") Path is not okay")));
-                    RealAgent agent = indexToAgent.get(j);
-                    setAgentBSPath(agent);
+            // Recursive case: Each path against the last one
+            for (int i = 1; i < paths.size(); i++) {
+                if (checkPaths(baseStation.getCommRange(), paths.get(i - 1), paths.get(i))) {
+                    baseStation.announce("Agent ".concat(String.valueOf(i).concat(") Path is okay")));
+                    indexToAgent.get(i).setPathInvalid();
+                    indexToAgent.get(i).setPath(paths.get(i));
+                    setState(indexToAgent.get(i), State.WaitForSuccessors);
+                } else {
+                    // Step 6
+                    predPoint = indexToAgent.get(i - 1).getLocation();
+                    predId = i - 1;
+                    setSuccessors(indexToAgent.get(i), State.MovingToPredecessor);
+                    for (int j = i; j < agentToIndex.size(); j++) {
+                        baseStation.announce("Agent ".concat(String.valueOf(j).concat(") Path is not okay")));
+                        RealAgent agent = indexToAgent.get(j);
+                        setAgentBSPath(agent);
+                    }
+                    break;
                 }
-                break;
             }
-        }
 
-        agentBSPaths = newBSPaths;
+            agentBSPaths = newBSPaths;
+            return;
+        }
     }
 
     private void goHome(){

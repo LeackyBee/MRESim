@@ -200,11 +200,11 @@ public class Path {
             }
             //Path inside an area, normal planning
             if (!jump) {
-                this.found = calculateAStarPath(exact);
+                this.found = calculateAlecAStarPath(exact);
             } else {
                 this.found = calculateJumpPath();
                 if (!this.found) {
-                    this.found = calculateAStarPath(exact);
+                    this.found = calculateAlecAStarPath(exact);
                 }
             }
             return true;
@@ -214,11 +214,11 @@ public class Path {
         if (!foundNodePath || pathNodes.size() < 3) {
             //Again normal planning as there was no path found using nodes
             if (!jump) {
-                this.found = calculateAStarPath(exact);
+                this.found = calculateAlecAStarPath(exact);
             } else {
                 this.found = calculateJumpPath();
                 if (!this.found) {
-                    this.found = calculateAStarPath(exact);
+                    this.found = calculateAlecAStarPath(exact);
                 }
             }
         } else {
@@ -311,6 +311,7 @@ public class Path {
     }
 
     final public boolean calculateAStarPath(boolean exact) {
+        System.out.println("planning");
         int stepSize = SimConstants.STEP_SIZE;
         if (exact) {
             stepSize = 1;
@@ -325,7 +326,6 @@ public class Path {
         }
 
         //implementing http://en.wikipedia.org/wiki/A*#Pseudocode
-        List<Point> closedSet = new LinkedList<Point>();
         List<Point> openSet = new LinkedList<Point>();
 
         openSet.add(startPoint);
@@ -342,6 +342,7 @@ public class Path {
         boolean limit_hit = false;
 
         while (!openSet.isEmpty()) {
+            System.out.println("cycle");
             long time_elapsed = System.currentTimeMillis() - realtimeStart;
             int maxTime = SimConstants.MAX_PATH_SEARCH_TIME;
             if (exact) {
@@ -364,12 +365,8 @@ public class Path {
             }
 
             openSet.remove(current_index);
-            closedSet.add(current);
 
             for (Point neighbour : neighbours(current, stepSize)) {
-                if (closedSet.contains(neighbour)) {
-                    continue;
-                }
                 if(grid.numPossibleObstaclesOnLine(current.x,current.y,neighbour.x,neighbour.y) > 0){
                     continue;
                 }
@@ -437,22 +434,22 @@ public class Path {
 
 
             for(Point n : neighbours){
-                if(!grid.locationExists(n.x, n.y) || grid.obstacleAt(n) || grid.numObstaclesOnLine(c.x, c.y, n.x,n.y) > 0 || !grid.legalMove(c, n) || !grid.legalMove(n,c)){
+                if(!grid.locationExists(n.x, n.y) || !grid.freeSpaceAt(n.x, n.y) || grid.numObstaclesOnLine(c.x, c.y, n.x,n.y) > 0 || !grid.legalMove(c, n) || !grid.legalMove(n,c)){
                     gScores.put(n, Double.MAX_VALUE);
                     fScores.put(n, Double.MAX_VALUE);
                     continue;
                 }
 
-                int wallDist = 50;
+                int wallDist = 5;
 
                 // Only care about avoiding walls if the avoidance wouldn't exclude the goal
-
                 double tempGScore;
 
-                if(n.distance(goalPoint) < wallDist){
-                    tempGScore = gScores.get(c) + c.distance(n);
+
+                if(n.distance(startPoint) > wallDist && n.distance(goalPoint) > wallDist && grid.obstacleWithinDistance(n.x,n.y,wallDist)){
+                    tempGScore = Double.MAX_VALUE-10000 + gScores.get(c) + c.distance(n); // arbitrary offset so that these don't get chosen unless necessary
                 } else{
-                    tempGScore = gScores.get(c) + c.distance(n) * (grid.obstacleWithinDistance(n.x, n.y, wallDist) ? 10 : 1);
+                    tempGScore = gScores.get(c) + c.distance(n);
                 }
 
 
@@ -1058,11 +1055,11 @@ public class Path {
     public Point nextPoint() {
         if (pathPoints.isEmpty()) {
             if (!jump) {
-                calculateAStarPath(false);
+                calculateAlecAStarPath(false);
             } else {
                 calculateJumpPath();
                 if (pathPoints.isEmpty()) {
-                    calculateAStarPath(false);
+                    calculateAlecAStarPath(false);
                 }
             }
         }
@@ -1171,7 +1168,7 @@ public class Path {
         this.exact = true;
         this.valid = true;
         if (this.tMap == null) {
-            this.found = calculateAStarPath(exact);
+            this.found = calculateAlecAStarPath(exact);
         } else {
             calcuateTopoPath();
         }

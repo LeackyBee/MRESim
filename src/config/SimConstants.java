@@ -55,7 +55,7 @@ import java.nio.file.Paths;
  */
 public class SimConstants {
 
-    public static final boolean ALEC_DEBUG = false;
+    public static final boolean ALEC_DEBUG = true;
 
     /**
      * Show messages on stdout. Remember to clean build if changed!

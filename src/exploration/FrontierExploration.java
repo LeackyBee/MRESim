@@ -277,7 +277,6 @@ public class FrontierExploration extends BasicExploration implements Exploration
         }
         // If we reach this point, we have a path.  Remove the first point
         // since this is the robot itself.
-        //agent.getPath().getPoints().remove(0);
         nextStep = agent.getPath().nextPoint();
         return nextStep;
     }

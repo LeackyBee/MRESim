@@ -13,7 +13,6 @@ import java.awt.*;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 public class FrontierAlec extends BasicExploration implements Exploration{
@@ -140,8 +139,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
                         state = State.RETURN;
                         return agent.stay();
                     }
-                    System.out.println("cycle");
-                    System.out.println(frontierTarget);
                     agent.addBadFrontier(frontierTarget);
                     p = agent.calculateAStarPath(destination, EXACT_PATH);
                 } while(!p.isValid());
@@ -161,6 +158,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
     private Point takeStep_ReturnToBase(int timeElapsed){
         agent.announce("Returning to Base");
         if(agent.getTeammateByNumber(SimConstants.BASE_STATION_TEAMMATE_ID).hasCommunicationLink()){
+            agent.announce("Met base");
             agent.setPathInvalid();
             state = State.EXPLORE;
             Path p;
@@ -175,16 +173,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
         }
 
         if(agent.getPath() == null || agent.getPath().isFinished() || agent.getEnvError() || !agent.getPath().isValid() || agent.getPath().getLength() == 0){
-            System.out.println("stuck here");
-            if(agent.getPath() == null){
-                System.out.println("null path");
-            } else if(agent.getPath().isFinished()){
-                System.out.println("path finished");
-            } else if(agent.getEnvError()){
-                System.out.println("env error");
-            } else if(agent.getPath().isValid()){
-                System.out.println("path invalid");
-            }
             agent.setEnvError(false);
             agent.setPathToBaseStation(EXACT_PATH);
         }
@@ -211,6 +199,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
 
                 Frontier frontier = frontiers.poll();
                 for (int i = 0; i < index; i++) {
+                    agent.addBadFrontier(frontier); // Add this to bad frontiers as another agent will explore it
                     frontier = frontiers.poll();
                 }
                 assert frontier != null;
