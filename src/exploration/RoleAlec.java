@@ -229,7 +229,6 @@ public class RoleAlec extends BasicExploration implements Exploration{
     }
 
     private synchronized Point meetRendezvous(){
-        System.out.println("met rend");
         agent.announce("Met Partner");
         stillInComms = true;
 
@@ -246,7 +245,6 @@ public class RoleAlec extends BasicExploration implements Exploration{
             agentState = State.Exploring;
             agent.setPath(agent.calculatePath(destination,EXACT_PATH));
             while(agent.getPath() == null || !agent.getPath().found || !agent.getPath().isValid()){
-                System.out.println("cycle");
                 agent.addBadFrontier(frontierTarget);
                 agent.announce("Added to bad frontiers: ".concat(frontierTarget.toString()));
                 destination = null;

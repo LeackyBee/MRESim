@@ -311,7 +311,6 @@ public class Path {
     }
 
     final public boolean calculateAStarPath(boolean exact) {
-        System.out.println("planning");
         int stepSize = SimConstants.STEP_SIZE;
         if (exact) {
             stepSize = 1;
@@ -342,7 +341,6 @@ public class Path {
         boolean limit_hit = false;
 
         while (!openSet.isEmpty()) {
-            System.out.println("cycle");
             long time_elapsed = System.currentTimeMillis() - realtimeStart;
             int maxTime = SimConstants.MAX_PATH_SEARCH_TIME;
             if (exact) {
@@ -1138,22 +1136,11 @@ public class Path {
     public boolean testPath(boolean complete) {
         if (complete && (pathPoints == null || pathPoints.isEmpty() || !pathPoints.get(0).equals(this.startPoint) || !pathPoints.get(pathPoints.size() - 1).equals(this.goalPoint))) {
             this.found = false;
-            System.out.println("failed here");
-            if(pathPoints == null){
-                System.out.println("null path points");
-            } else if(pathPoints.isEmpty()){
-                System.out.println("empty path points");
-            } else if(!pathPoints.get(0).equals(this.startPoint)){
-                System.out.println("start point not in pathpoints");
-            } else if(!pathPoints.get(pathPoints.size() - 1).equals(this.goalPoint)){
-                System.out.println("end point not in pathpoints");
-            }
             this.setInvalid();
             return false;
         }
         for (int i = 1; i < pathPoints.size(); i++) {
             if (pathPoints.get(i).distance(pathPoints.get(i - 1)) > 30) {
-                System.out.println("too far");
                 return false;
             }
         }

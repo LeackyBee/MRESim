@@ -117,7 +117,6 @@ public class HungarianComms {
 
         HungarianAlgorithm alg = new HungarianAlgorithm(matrix);
         int[][] assignment = alg.findOptimalAssignment();
-        System.out.println(Arrays.deepToString(assignment));
         int assigned = 0;
         for(int[] pair : assignment){
             if(pair[0] < count){
@@ -129,7 +128,6 @@ public class HungarianComms {
         Collection<TopologicalNode> nodes = a.getTopologicalMap().getTopologicalNodes(true).values()
                 .stream().filter(node -> a.getOccupancyGrid().locationExists(node.getPosition().x, node.getPosition().y))
                 .collect(Collectors.toList());
-        System.out.println(nodes);
 
         Optional<TopologicalNode> newMeet = nodes.stream().max(Comparator.comparingInt(TopologicalNode::getDegree));
         newMeet.ifPresent(topologicalNode -> meetup = topologicalNode.getPosition());
@@ -138,8 +136,6 @@ public class HungarianComms {
             agentPoints.set(assigned, meetup);
             assigned++;
         }
-        System.out.println(agentPoints);
-
     }
 
 }

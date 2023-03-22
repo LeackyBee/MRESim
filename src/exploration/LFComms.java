@@ -275,7 +275,6 @@ public class LFComms {
             }
             if(!a.getPath().isValid()){
                 a.announce("Path invalid");
-                System.out.println("here");
                 a.setPath(a.calculateAStarPath(getPoint(a),EXACT_PATH));
             }
 
@@ -348,8 +347,6 @@ public class LFComms {
                 } else{
                     f = ft.get();
                 }
-                System.out.println(f);
-                System.out.println(f.getSize());
                 baseStation.announce(f.toString());
                 failPlanFrontiers.add(f);
                 // Step 2)
@@ -372,7 +369,6 @@ public class LFComms {
 
             if (lP.distance(f.getCentre()) > leader.getSenseRange() ||
                     leader.getOccupancyGrid().numObstaclesOnLine(lP.x, lP.y, f.getCentre().x, f.getCentre().y) > 0) {
-                System.out.println("trigger");
                 leader.addBadFrontier(f);
                 p = null;
                 f = null;
@@ -387,7 +383,6 @@ public class LFComms {
                 if(pt.isValid()){
                     paths.add(pt);
                 } else{
-                    System.out.println("failed");
                     goHome();
                     explored.remove(f);
                     return;
