@@ -59,6 +59,7 @@ import config.SimulatorConfig;
 import environment.Environment;
 import environment.Environment.Status;
 import environment.OccupancyGrid;
+import exploration.HungarianComms;
 import gui.MainGUI;
 import java.awt.Point;
 import java.awt.Polygon;
@@ -277,6 +278,14 @@ public class SimulationFramework implements ActionListener {
             System.out.println();
             System.out.println("Timestep: ".concat(String.valueOf(timeElapsed)));
         }
+        HungarianComms.writeToDebug("\n");
+        HungarianComms.writeToDebug("Timestep: ".concat(String.valueOf(timeElapsed)));
+        for(RealAgent a : agent){
+            HungarianComms.writeToDebug("Agent ".concat(a.toString()).concat(" map knowledge"));
+            HungarianComms.writeToDebug(String.valueOf(a.getStats().getPercentageKnown()));
+        }
+
+
         agent[0].flushLog();
 
         // Update data

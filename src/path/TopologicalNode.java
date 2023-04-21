@@ -44,9 +44,12 @@
 package path;
 
 import config.SimConstants;
+import environment.Frontier;
+import environment.OccupancyGrid;
+import exploration.Fibonacci;
+
 import java.awt.Point;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
+import java.util.*;
 
 /**
  *
@@ -61,6 +64,11 @@ public class TopologicalNode {
     private LinkedList<Point> cells; //occupancy grid cells allocated to this node
     private boolean deadEnd;
 
+    private TopologicalNode parent;
+
+    private List<Frontier> frontiers;
+
+    private boolean skinned;
     public TopologicalNode(int ID, Point position) {
         this.ID = ID;
         this.position = (Point) position.clone();
@@ -68,7 +76,123 @@ public class TopologicalNode {
         neighbour_paths = new LinkedList<Path>();
         cells = new LinkedList<Point>();
         deadEnd = false;
+        parent = null;
+        frontiers = new ArrayList<>();
+        skinned = false;
+    }
 
+    public TopologicalNode getParent(){
+        return parent;
+    }
+
+    public void addFrontier(Frontier f){
+        frontiers.add(f);
+    }
+
+    public List<Frontier> getFrontiers(){
+        return frontiers;
+    }
+
+    public void clearNeighbours(){
+        neighbours.clear();
+    }
+
+    public boolean wasSkinned(){
+        return skinned;
+    }
+
+    private void setSkinned(){
+        skinned = true;
+    }
+
+    public boolean isUseless(){
+        if(!frontiers.isEmpty()){
+            return false;
+        }
+        if(!neighbours.isEmpty()){
+            skin();
+        }
+        return neighbours.isEmpty() && frontiers.isEmpty();
+    }
+
+    private boolean thinned;
+
+    public boolean wasThinned(){
+        return thinned;
+    }
+
+    public void removeNeighbour(TopologicalNode neighbour){
+        neighbours.remove(neighbour);
+    }
+
+    public void thin(){
+        if(getFrontiers().isEmpty() && parent != null){
+            if(getListOfNeighbours().size() == 1){
+                parent.addNeighbour(neighbours.get(0), null);
+                neighbours.get(0).setParent(parent);
+                parent.removeNeighbour(this);
+                thinned = true;
+            } else if(getListOfNeighbours().size() == 0){
+                parent.removeNeighbour(this);
+                thinned = true;
+            }
+        }
+    }
+
+    public void skin(){
+        List<TopologicalNode> toRemove = new ArrayList<>();
+        for(TopologicalNode n : neighbours){
+            if(n.isUseless()){
+                n.setSkinned();
+                toRemove.add(n);
+            }
+        }
+        neighbours.removeAll(toRemove);
+    }
+
+    public void makeDoublyLinked(){
+        this.neighbours.forEach(n -> n.addNeighbour(this, null));
+    }
+
+    int rank = -1;
+    public int centroidRank(){
+        if(rank != -1){
+            return rank;
+        }
+
+        Queue<TopologicalNode> next = new LinkedList<>();
+        Queue<TopologicalNode> curr = new LinkedList<>(this.neighbours);
+        List<TopologicalNode> seen = new LinkedList<>();
+        seen.add(this);
+
+        int level = 1;
+        int output = 0;
+        while(!curr.isEmpty()){
+            for(TopologicalNode node : curr){
+                seen.add(node);
+                if(!node.neighbours.isEmpty()){
+                    output += level;
+                }
+
+
+                for(TopologicalNode n : node.neighbours){
+                    if(!seen.contains(n)){
+                        next.add(n);
+                    }
+                }
+            }
+            level++;
+            curr.clear();
+            curr.addAll(next);
+            next.clear();
+        }
+        rank = output;
+        return output;
+    }
+
+    public void setParent(TopologicalNode parent){
+        this.parent = parent;
+        neighbours.remove(parent);
     }
 
     public int getID() {
@@ -84,6 +208,9 @@ public class TopologicalNode {
     }
 
     public boolean addNeighbour(TopologicalNode neighbour, Path path) {
+        if(neighbour.equals(this)){
+            return false;
+        }
         if (!neighbours.contains(neighbour)) {
             neighbours.add(neighbour);
             if (ID != SimConstants.UNEXPLORED_NODE_ID && neighbour.getID() != SimConstants.UNEXPLORED_NODE_ID && path != null && (path.getStartPoint().distance(this.position) > 10 || !path.testPath(true))) {
@@ -102,15 +229,6 @@ public class TopologicalNode {
 
     public LinkedList<TopologicalNode> getListOfNeighbours() {
         return neighbours;
-    }
-
-    public Path getPathToNeighbour(TopologicalNode neighbour) {
-        try {
-            int index = neighbours.indexOf(neighbour);
-            return neighbour_paths.get(index);
-        } catch (IndexOutOfBoundsException ex) {
-            return null;
-        }
     }
 
     public void addCell(Point p) {
@@ -173,4 +291,32 @@ public class TopologicalNode {
         return "TopoNode[" + this.ID + "] at Position " + this.position + " with " + this.neighbours.size() + " neighbors";
     }
 
+    public Path getPathToNeighbour(TopologicalNode neighbour) {
+        try {
+            int index = neighbours.indexOf(neighbour);
+            return neighbour_paths.get(index);
+        } catch (IndexOutOfBoundsException ex) {
+            return null;
+        }
+    }
+
+    public double getLengthToNeighbour(TopologicalNode neighbour){
+        try {
+            int index = neighbours.indexOf(neighbour);
+            return neighbour_paths.get(index).getLength();
+        } catch (IndexOutOfBoundsException ex) {
+            return Double.MAX_VALUE;
+        }
+    }
+
+    public void removeImpossibleNeighbours(OccupancyGrid g) {
+        for(int i = 0; i < neighbours.size(); i++){
+            TopologicalNode n = neighbours.get(i);
+            if(!g.locationExists(n.getPosition().x, n.getPosition().y)){
+                neighbour_paths.remove(i);
+                neighbours.remove(i);
+                i--;
+            }
+        }
+    }
 }

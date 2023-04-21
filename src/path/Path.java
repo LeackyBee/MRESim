@@ -402,8 +402,13 @@ public class Path {
         frontier.add(startPoint);
 
         while(!frontier.isEmpty()){
+
             Point c = frontier.stream().min(
-                    (a,b) -> (int) (fScores.getOrDefault(a, Double.MAX_VALUE) - fScores.getOrDefault(b, Double.MAX_VALUE))).get();
+                    Comparator.comparingDouble(a -> fScores.getOrDefault((Point) a, Double.MAX_VALUE))
+                            .thenComparing(a -> Math.hypot(((Point) a).x, ((Point) a).y))).get();
+
+            // Choose the point with the lowest f-score,
+            // using their distance from (0,0) as an arbitrary deterministic tiebreak
 
             if(c.distance(goalPoint) < stepSize && !c.equals(goalPoint)){
                 backtrace.put(goalPoint, c);
@@ -445,7 +450,7 @@ public class Path {
 
 
                 if(n.distance(startPoint) > wallDist && n.distance(goalPoint) > wallDist && grid.obstacleWithinDistance(n.x,n.y,wallDist)){
-                    tempGScore = Double.MAX_VALUE-10000 + gScores.get(c) + c.distance(n); // arbitrary offset so that these don't get chosen unless necessary
+                    tempGScore = Double.MAX_VALUE-100000 + gScores.get(c) + c.distance(n); // arbitrary offset so that these don't get chosen unless necessary
                 } else{
                     tempGScore = gScores.get(c) + c.distance(n);
                 }

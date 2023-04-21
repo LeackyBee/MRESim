@@ -52,18 +52,31 @@ public class HungarianAlec extends BasicExploration implements Exploration{
             agent.announce("Reached Target");
             agentState = AgentState.Return;
             agent.setPath(agent.calculateAStarPath(meetup, EXACT_PATH));
+            HungarianComms.writeToDebug("Path from ".concat(agent.getLocation().toString()).concat(" to meetup at ".concat(meetup.toString())));
+            for (Point p : agent.getPath().getPoints()){
+                HungarianComms.writeToDebug(p.toString());
+            }
             return takeStep_Return();
         }
 
         if(agent.getPath() == null || agent.getPath().isFinished()){
             agent.announce("Planning Explore Path");
             agent.setPath(agent.calculateAStarPath(target, EXACT_PATH));
+            HungarianComms.writeToDebug("Path from ".concat(agent.getLocation().toString()).concat(" to target at ".concat(target.toString())));
+            for (Point p : agent.getPath().getPoints()){
+                HungarianComms.writeToDebug(p.toString());
+            }
         }
 
         if(agent.getEnvError()){
             agent.setEnvError(false);
             agentState = AgentState.Return;
             agent.setPath(agent.calculateAStarPath(meetup, EXACT_PATH));
+            HungarianComms.writeToDebug("Env Error, not reaching target of ".concat(target.toString()));
+            HungarianComms.writeToDebug("Path from ".concat(agent.getLocation().toString()).concat(" to meetup at ".concat(meetup.toString())));
+            for (Point p : agent.getPath().getPoints()){
+                HungarianComms.writeToDebug(p.toString());
+            }
             return takeStep_Return();
         }
 
@@ -72,6 +85,7 @@ public class HungarianAlec extends BasicExploration implements Exploration{
 
     @Override
     public synchronized Point takeStep(int timeElapsed) {
+        HungarianComms.writeToDebug("Position: ".concat(agent.getLocation().toString()));
 
         switch(agentState){
             case Explore:
@@ -99,6 +113,10 @@ public class HungarianAlec extends BasicExploration implements Exploration{
             agent.setEnvError(false);
             agent.announce("Planning Return Path");
             agent.setPath(agent.calculateAStarPath(meetup, EXACT_PATH));
+            HungarianComms.writeToDebug("Path from ".concat(agent.getLocation().toString()).concat(" to meetup at ".concat(meetup.toString())));
+            for (Point p : agent.getPath().getPoints()){
+                HungarianComms.writeToDebug(p.toString());
+            }
         }
 
         return agent.getNextPathPoint();

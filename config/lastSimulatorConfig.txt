@@ -2,7 +2,7 @@ FrontierExploration
 PeriodicReturn
 RangeBorder
 null
-DirectLine
+StaticCircle
 false
 /home/alec/Documents/MRESim Logs/AgentLocations.txt
 false

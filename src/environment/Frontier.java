@@ -86,9 +86,14 @@ public class Frontier implements Comparable<Frontier> {
 
     @Override
     public int compareTo(Frontier other) {
-        if ((other.area / other.getDistanceToCentre()) > (this.area / this.distanceToCentre)) {
+        double v1 = other.area/other.getDistanceToCentre();
+        double v2 = this.area /this.getDistanceToCentre();
+
+        if(v1 > v2){
             return 1;
-        } else {
+        } else if(v1 == v2){
+            return (int) (Math.hypot(other.centre.x, other.centre.y) - Math.hypot(this.centre.x, this.centre.y));
+        } else{
             return -1;
         }
     }
@@ -302,8 +307,8 @@ public class Frontier implements Comparable<Frontier> {
 
     @Override
     public String toString() {
-        return "Frontier found with area " + area
-                + ", and centre (" + centre.x + "," + centre.y + ").";
+        return "Area " + area
+                + ", centre (" + centre.x + "," + centre.y + ").";
     }
 
 }

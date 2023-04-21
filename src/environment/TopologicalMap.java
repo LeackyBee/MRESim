@@ -188,6 +188,8 @@ public class TopologicalMap {
 
     public HashMap<Integer, TopologicalNode> getTopologicalNodes(boolean update) {
         if (topologicalNodes == null || update) {
+            keyPoints = null;
+            skeletonGrid = null;
             generateKeyAreas();
         }
         return topologicalNodes;

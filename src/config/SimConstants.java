@@ -55,7 +55,8 @@ import java.nio.file.Paths;
  */
 public class SimConstants {
 
-    public static final boolean ALEC_DEBUG = true;
+    public static final boolean ALEC_DEBUG = false;
+    public static final boolean ALEC_DEBUG_TEMP = true;
 
     /**
      * Show messages on stdout. Remember to clean build if changed!
@@ -168,7 +169,7 @@ public class SimConstants {
      * Minimum size a frontier must have to be considered as part of exploration. Default 20 or 3 or
      * 5
      */
-    public static final int MIN_FRONTIER_SIZE = 5;
+    public static final int MIN_FRONTIER_SIZE = 20;
 
     /**
      * How long should we assume that the teammate is exploring the. frontier that he last told us
