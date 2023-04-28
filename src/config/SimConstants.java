@@ -56,7 +56,11 @@ import java.nio.file.Paths;
 public class SimConstants {
 
     public static final boolean ALEC_DEBUG = false;
-    public static final boolean ALEC_DEBUG_TEMP = true;
+
+    public static final boolean AVOID_WALLS = false;
+
+    public static final int AVOID_WALL_DISTANCE = 5;
+
 
     /**
      * Show messages on stdout. Remember to clean build if changed!

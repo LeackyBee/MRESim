@@ -346,7 +346,7 @@ public class Path {
             if (exact) {
                 maxTime = 5 * SimConstants.MAX_PATH_SEARCH_TIME;
             }
-            if ((time_elapsed > maxTime) /*&& (limit)*/) {
+            if (false && (time_elapsed > maxTime) /*&& (limit)*/) {
                 System.err.println("Took too long (A*), startpoint is " + startPoint.toString()
                         + ", endpoint is " + goalPoint.toString() + "time elapsed: " + time_elapsed + "ms.");
 
@@ -403,17 +403,11 @@ public class Path {
 
         while(!frontier.isEmpty()){
 
+            // Choose the point with the lowest f-score,
+            // using their distance from (0,0) as an arbitrary deterministic tiebreak
             Point c = frontier.stream().min(
                     Comparator.comparingDouble(a -> fScores.getOrDefault((Point) a, Double.MAX_VALUE))
                             .thenComparing(a -> Math.hypot(((Point) a).x, ((Point) a).y))).get();
-
-            // Choose the point with the lowest f-score,
-            // using their distance from (0,0) as an arbitrary deterministic tiebreak
-
-            if(c.distance(goalPoint) < stepSize && !c.equals(goalPoint)){
-                backtrace.put(goalPoint, c);
-                c = goalPoint;
-            }
 
             if(c.equals(goalPoint)){
                 reversePathPoints.add(c);
@@ -430,32 +424,17 @@ public class Path {
                 return testPath(true);
             }
 
-
             frontier.remove(c);
 
             List<Point> neighbours = neighbours(c, stepSize);
 
 
             for(Point n : neighbours){
-                if(!grid.locationExists(n.x, n.y) || !grid.freeSpaceAt(n.x, n.y) || grid.numObstaclesOnLine(c.x, c.y, n.x,n.y) > 0 || !grid.legalMove(c, n) || !grid.legalMove(n,c)){
-                    gScores.put(n, Double.MAX_VALUE);
-                    fScores.put(n, Double.MAX_VALUE);
-                    continue;
+                double tempGScore = gScores.get(c) + c.distance(n);
+                if(SimConstants.AVOID_WALLS && grid.obstacleWithinDistance(n.x,n.y,SimConstants.AVOID_WALL_DISTANCE) && n.distance(startPoint) > SimConstants.AVOID_WALL_DISTANCE && n.distance(goalPoint) > SimConstants.AVOID_WALL_DISTANCE){
+                    // Only care about avoiding walls if the avoidance wouldn't exclude the goal
+                    tempGScore += Double.MAX_VALUE/2; // arbitrary offset so that these don't get chosen unless necessary
                 }
-
-                int wallDist = 5;
-
-                // Only care about avoiding walls if the avoidance wouldn't exclude the goal
-                double tempGScore;
-
-
-                if(n.distance(startPoint) > wallDist && n.distance(goalPoint) > wallDist && grid.obstacleWithinDistance(n.x,n.y,wallDist)){
-                    tempGScore = Double.MAX_VALUE-100000 + gScores.get(c) + c.distance(n); // arbitrary offset so that these don't get chosen unless necessary
-                } else{
-                    tempGScore = gScores.get(c) + c.distance(n);
-                }
-
-
 
                 if(tempGScore < gScores.getOrDefault(n, Double.MAX_VALUE)){
                     backtrace.put(n, c);

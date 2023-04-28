@@ -226,6 +226,10 @@ public class RealAgent extends Agent {
         return occGrid;
     }
 
+    public void setOccupancyGrid(OccupancyGrid occ){
+        occGrid = occ;
+    }
+
     public LinkedList<Point> getDirtyCells() {
         if (dirtyCells == null) {
             dirtyCells = new LinkedList<Point>();
@@ -524,7 +528,7 @@ public class RealAgent extends Agent {
                         setRole(((RunFromLog) exploration).getRole(timeElapsed));
                         break;
                     case LeaderFollower:
-                        exploration = new LeaderFollowerAlec(this, simConfig, ExplorationState.Initial);
+                        exploration = new LeaderFollower(this, simConfig, baseStation);
                         break;
                     case FrontierExploration:
                         exploration = new HungarianAlec(this, simConfig, ExplorationState.Initial);

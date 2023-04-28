@@ -138,7 +138,6 @@ public class TopologicalNode {
             }
         }
     }
-
     public void skin(){
         List<TopologicalNode> toRemove = new ArrayList<>();
         for(TopologicalNode n : neighbours){
@@ -149,7 +148,6 @@ public class TopologicalNode {
         }
         neighbours.removeAll(toRemove);
     }
-
     public void makeDoublyLinked(){
         this.neighbours.forEach(n -> n.addNeighbour(this, null));
     }
@@ -170,10 +168,8 @@ public class TopologicalNode {
         while(!curr.isEmpty()){
             for(TopologicalNode node : curr){
                 seen.add(node);
-                if(!node.neighbours.isEmpty()){
-                    output += level;
-                }
 
+                output += Math.log(level);
 
                 for(TopologicalNode n : node.neighbours){
                     if(!seen.contains(n)){

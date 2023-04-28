@@ -5,6 +5,7 @@ import agents.RealAgent;
 import config.SimConstants;
 import environment.ContourTracer;
 import environment.Frontier;
+import environment.OccupancyGrid;
 import path.TopologicalNode;
 
 import java.awt.*;
@@ -141,7 +142,6 @@ public class HungarianComms {
     }
 
     private void assignContours(){
-
         RealAgent aT = agents.get(0);
         double max = 0;
         for(RealAgent agent : agents){
@@ -375,8 +375,8 @@ public class HungarianComms {
             }
 
 
-            nodes.forEach(TopologicalNode::thin);
-            nodes.removeIf(TopologicalNode::wasThinned);
+            //nodes.forEach(TopologicalNode::thin);
+            //nodes.removeIf(TopologicalNode::wasThinned);
 
 
             if(SimConstants.ALEC_DEBUG){
@@ -422,6 +422,17 @@ public class HungarianComms {
             agentPoints.set(assigned, meetup);
             assigned++;
         }
+
+        // Ensure all agents possess the same map
+        // This should be done by the simulator, but it's not.
+        // This is necessary as sometimes we may select a meetup point that is outside
+        // of another agents map due to the buggy sharing.
+        OccupancyGrid occ = a.getOccupancyGrid();
+
+        for (RealAgent agent : agentToIndex.keySet()) {
+            agent.setOccupancyGrid(occ);
+        }
+
     }
 
 }
