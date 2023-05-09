@@ -6,7 +6,7 @@ import config.SimulatorConfig;
 
 import java.awt.*;
 
-public class HungarianAlec extends BasicExploration implements Exploration{
+public class HungarianExploration extends BasicExploration implements Exploration{
 
     private static final boolean EXACT_PATH = true;
 
@@ -33,7 +33,7 @@ public class HungarianAlec extends BasicExploration implements Exploration{
      * @param simConfig
      * @param initialState
      */
-    public HungarianAlec(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
+    public HungarianExploration(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
         super(agent, simConfig, initialState);
         agentState = AgentState.Return;
         comms = HungarianComms.register(agent);

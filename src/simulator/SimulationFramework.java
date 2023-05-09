@@ -553,6 +553,7 @@ public class SimulationFramework implements ActionListener {
     }
 
     public void kill() {
+        reset();
         timer.stop();
         if (SimConstants.DEBUG_OUTPUT) {
             System.out.println(this.toString() + "Resetting exploration!");

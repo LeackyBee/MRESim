@@ -246,8 +246,8 @@ public class RealAgent extends Agent {
     }
 
     public PriorityQueue<Frontier> getFrontiers() {
-        if (exploration instanceof FrontierExploration) {
-            return ((FrontierExploration) this.exploration).getFrontiers();
+        if (exploration instanceof FrontierBasedExploration) {
+            return ((FrontierBasedExploration) this.exploration).getFrontiers();
         } else {
             return null;
         }
@@ -528,13 +528,13 @@ public class RealAgent extends Agent {
                         setRole(((RunFromLog) exploration).getRole(timeElapsed));
                         break;
                     case LeaderFollower:
-                        exploration = new LeaderFollower(this, simConfig, baseStation);
+                        exploration = new LeaderFollower(this, simConfig, ExplorationState.Initial);
                         break;
                     case FrontierExploration:
-                        exploration = new HungarianAlec(this, simConfig, ExplorationState.Initial);
+                        exploration = new FrontierBasedExploration(this, simConfig, ExplorationState.Initial);
                         break;
                     case RoleBasedExploration:
-                        exploration = new RoleAlec(this, simConfig, ExplorationState.Initial);
+                        exploration = new RoleBasedExploration(this, simConfig, ExplorationState.Initial);
                         break;
                     case Testing:
                     case Random:

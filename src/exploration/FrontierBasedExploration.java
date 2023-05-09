@@ -13,9 +13,10 @@ import java.awt.*;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
-public class FrontierAlec extends BasicExploration implements Exploration{
+public class FrontierBasedExploration extends BasicExploration implements Exploration{
 
     private static final boolean EXACT_PATH = true;
     private static final int COMMUNICATIONS_FLUSH_TIMER = 10;
@@ -40,7 +41,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
     /**
      * @param agent The agent using this ExplorationStrategy
      */
-    public FrontierAlec(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
+    public FrontierBasedExploration(RealAgent agent, SimulatorConfig simConfig, Agent.ExplorationState initialState) {
         super(agent, simConfig, initialState);
         agent.announce("Frontier-Based Initialised");
     }
@@ -87,7 +88,7 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             return agent.getNextPathPoint();
         }
 
-        /*
+
         // Checks if the robot has begun communicating with another robot
         // This check is important as this signals that new data has been received
         AtomicBoolean newComm = new AtomicBoolean(false);
@@ -107,7 +108,6 @@ public class FrontierAlec extends BasicExploration implements Exploration{
             agent.setPath(null);
             agent.setEnvError(false);
         }
-         */
 
         // If we have an EnvError the agent is stuck, so we need to replan
         if(agent.getEnvError()){
@@ -232,6 +232,10 @@ public class FrontierAlec extends BasicExploration implements Exploration{
     protected Stream<TeammateAgent> getCommunications(){
         return agent.getAllTeammates().values().stream()
                 .filter(TeammateAgent::hasCommunicationLink).filter(t -> t.getRobotNumber() != agent.baseStation.getRobotNumber());
+    }
+
+    public PriorityQueue<Frontier> getFrontiers(){
+        return frontiers;
     }
 
     protected void disableTimer(){

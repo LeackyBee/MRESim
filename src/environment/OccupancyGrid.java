@@ -213,6 +213,7 @@ public class OccupancyGrid implements IntGrid {
                         //this.setByte(i, j, (byte)(this.getByte(i,j) | partnerOccGrid.getByte(i,j)));
                     }
 
+
                     if (partnerOccGrid.safeSpaceAt(i, j)) {
                         if (partnerOccGrid.freeSpaceAt(i, j)) {
                             if (this.safeSpaceAt(i, j) && (this.obstacleAt(i, j))) {
